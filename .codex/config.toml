@@ -1,0 +1,18 @@
+[mcp_servers.microsoft-learn]
+url = "https://learn.microsoft.com/api/mcp"
+
+[mcp_servers.code-memory]
+command = "npx"
+args = ["-y", "@uworx/code-memory"]
+
+[mcp_servers.code-memory.tools.ping]
+approval_mode = "approve"
+
+[mcp_servers.code-memory.tools.semantic_search]
+approval_mode = "approve"
+
+[mcp_servers.code-memory.tools.get_architecture_overview]
+approval_mode = "approve"
+
+[mcp_servers.code-memory.tools.get_edit_context]
+approval_mode = "approve"

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "microsoft-learn": {
+      "url": "https://learn.microsoft.com/api/mcp",
+      "type": "http"
+    },
+    "code-memory": {
+      "type": "local",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@uworx/code-memory"
+      ],
+      "tools": [
+        "*"
+      ]
+    }
+  }
+}
