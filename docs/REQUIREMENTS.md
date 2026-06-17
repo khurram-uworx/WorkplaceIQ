@@ -45,21 +45,21 @@ A customer intranet should be composed declaratively inside an ASP.NET MVC / Raz
 Example:
 
 ```html
-<wi-newsfeed id="PowerOutages"
+<iq-newsfeed id="PowerOutages"
              title="Power Outages in Factory"
              allow-comments="true"
              ai-enabled="true" />
 
-<wi-forum id="MaintenanceHelpdesk"
+<iq-forum id="MaintenanceHelpdesk"
           title="Maintenance Helpdesk"
           allow-comments="true"
           ai-summary="daily" />
 
-<wi-files id="HRPolicies"
+<iq-files id="HRPolicies"
           title="HR Policies"
           allow-chat="true" />
 
-<wi-entity type="Machine"
+<iq-entity type="Machine"
            title="Factory Machines"
            ai-profile="true" />
 ```
@@ -457,7 +457,7 @@ The platform should support containers that are generated from filters, rules, o
 Example:
 
 ```html
-<wi-feed id="Last7DaysOutages"
+<iq-feed id="Last7DaysOutages"
          title="Last 7 Days Outages"
          source="PowerOutages"
          filter="createdAt >= today - 7d"
@@ -569,7 +569,7 @@ Supported summary types:
 Example:
 
 ```html
-<wi-newsfeed id="PowerOutages"
+<iq-newsfeed id="PowerOutages"
              title="Power Outages"
              ai-summary="daily" />
 ```
@@ -641,31 +641,31 @@ The platform should provide Razor Tag Helpers for rendering and binding platform
 Candidate Tag Helpers:
 
 ```html
-<wi-container />
-<wi-newsfeed />
-<wi-forum />
-<wi-files />
-<wi-directory />
-<wi-entity />
-<wi-comments />
-<wi-labels />
-<wi-metric />
-<wi-dashboard />
-<wi-ai-chat />
-<wi-ai-summary />
-<wi-insights />
+<iq-container />
+<iq-newsfeed />
+<iq-forum />
+<iq-files />
+<iq-directory />
+<iq-entity />
+<iq-comments />
+<iq-labels />
+<iq-metric />
+<iq-dashboard />
+<iq-ai-chat />
+<iq-ai-summary />
+<iq-insights />
 ```
 
 Example:
 
 ```html
-<wi-dashboard id="FactoryOperations"
+<iq-dashboard id="FactoryOperations"
               title="Factory Operations Dashboard">
-    <wi-metric name="TotalOutageTimeLast7Days" />
-    <wi-metric name="OutageCountLast7Days" />
-    <wi-feed id="Last7DaysOutages" />
-    <wi-insights source="PowerOutages" />
-</wi-dashboard>
+    <iq-metric name="TotalOutageTimeLast7Days" />
+    <iq-metric name="OutageCountLast7Days" />
+    <iq-feed id="Last7DaysOutages" />
+    <iq-insights source="PowerOutages" />
+</iq-dashboard>
 ```
 
 Requirements:
@@ -845,13 +845,13 @@ Dashboard components should support:
 Example dashboard declaration:
 
 ```html
-<wi-dashboard id="PowerOutageDashboard"
+<iq-dashboard id="PowerOutageDashboard"
               title="Power Outage Dashboard">
-    <wi-metric name="OutageCountLast7Days" />
-    <wi-metric name="TotalOutageTimeLast7Days" />
-    <wi-chart metric="OutageCount" group-by="machineId" />
-    <wi-insights source="PowerOutages" />
-</wi-dashboard>
+    <iq-metric name="OutageCountLast7Days" />
+    <iq-metric name="TotalOutageTimeLast7Days" />
+    <iq-chart metric="OutageCount" group-by="machineId" />
+    <iq-insights source="PowerOutages" />
+</iq-dashboard>
 ```
 
 ---
@@ -988,24 +988,24 @@ Use case: Factory Power Outages
 Components:
 
 ```html
-<wi-newsfeed id="PowerOutages"
+<iq-newsfeed id="PowerOutages"
              title="Power Outages in Factory"
              allow-comments="true"
              ai-enabled="true" />
 
-<wi-feed id="Last7DaysOutages"
+<iq-feed id="Last7DaysOutages"
          title="Last 7 Days Outages"
          source="PowerOutages"
          filter="createdAt >= today - 7d"
          system-generated="true" />
 
-<wi-dashboard id="PowerOutageDashboard"
+<iq-dashboard id="PowerOutageDashboard"
               title="Power Outage Dashboard">
-    <wi-metric name="OutageCountLast7Days" />
-    <wi-metric name="TotalOutageTimeLast7Days" />
-    <wi-ai-chat source="PowerOutages" />
-    <wi-insights source="PowerOutages" />
-</wi-dashboard>
+    <iq-metric name="OutageCountLast7Days" />
+    <iq-metric name="TotalOutageTimeLast7Days" />
+    <iq-ai-chat source="PowerOutages" />
+    <iq-insights source="PowerOutages" />
+</iq-dashboard>
 ```
 
 External system posts outage records through API:

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using WorkplaceIQ.AspNet;
 using WorkplaceIQ.AspNet.Data;
+using WorkplaceIQ.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,11 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<WorkplaceIqDbContext>();
     dbContext.Database.EnsureCreated();
+
+    if (app.Environment.IsDevelopment())
+    {
+        await DemoDataSeeder.SeedAsync(scope.ServiceProvider);
+    }
 }
 
 // Configure the HTTP request pipeline.

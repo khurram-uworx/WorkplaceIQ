@@ -2,24 +2,24 @@ using WorkplaceIQ.Components;
 using WorkplaceIQ.Containers;
 using WorkplaceIQ.Posts;
 
-namespace WorkplaceIQ.Feeds;
+namespace WorkplaceIQ.Forums;
 
-public sealed class FeedComponentService(IComponentService componentService) : IFeedComponentService
+public sealed class ForumComponentService(IComponentService componentService) : IForumComponentService
 {
-    public async Task<FeedComponentResult> ResolveFeedAsync(
-        FeedComponentRequest request,
+    public async Task<ForumComponentResult> ResolveForumAsync(
+        ForumComponentRequest request,
         CancellationToken cancellationToken = default)
     {
         var result = await componentService.ResolveAsync(
             new ComponentRequest(
                 request.Id,
-                request.Title ?? string.Empty,
-                ContainerTypes.Feed,
+                request.Title,
+                ContainerTypes.Forum,
                 request.AutoProvision,
-                "feed"),
+                "forum"),
             cancellationToken);
 
-        return new FeedComponentResult(
+        return new ForumComponentResult(
             result.Container,
             result.Posts,
             result.Created,
@@ -27,17 +27,17 @@ public sealed class FeedComponentService(IComponentService componentService) : I
             result.DisplayTitle);
     }
 
-    public Task<Post> CreatePostAsync(
-        string feedId,
+    public Task<Post> CreateThreadAsync(
+        string forumId,
         string title,
         string body,
         string? labels = null,
         CancellationToken cancellationToken = default)
     {
         return componentService.CreatePostAsync(
-            feedId,
-            ContainerTypes.Feed,
-            "feed",
+            forumId,
+            ContainerTypes.Forum,
+            "forum",
             title,
             body,
             labels,

@@ -1,9 +1,9 @@
 using WorkplaceIQ.Containers;
 using WorkplaceIQ.Posts;
 
-namespace WorkplaceIQ.Feeds;
+namespace WorkplaceIQ.Components;
 
-public sealed record FeedComponentResult(
+public sealed record ComponentResult(
     Container? Container,
     IReadOnlyList<Post> Posts,
     bool Created,

@@ -1,5 +1,67 @@
 @{
-    ViewData["Title"] = "News Feed";
+    ViewData["Title"] = "WorkplaceIQ Demo";
 }
 
-<wi-feed id="CompanyNews" title="News Feed"></wi-feed>
+<div class="iq-demo-grid">
+    <div>
+        <iq-feed id="CompanyNews" title="News Feed"></iq-feed>
+
+        <form asp-action="CreateFeedPost" method="post" class="mt-4">
+            <input type="hidden" name="feedId" value="CompanyNews" />
+
+            @if (TempData["FeedPostCreated"] is string feedMessage)
+            {
+                <div class="alert alert-success" role="status">@feedMessage</div>
+            }
+
+            <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label for="feed-post-title" class="form-label">Title</label>
+                <input id="feed-post-title" name="title" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label for="feed-post-body" class="form-label">Body</label>
+                <textarea id="feed-post-body" name="body" class="form-control" rows="3" required></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="feed-post-labels" class="form-label">Labels</label>
+                <input id="feed-post-labels" name="labels" class="form-control" placeholder="Operations, Update" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add item</button>
+        </form>
+    </div>
+
+    <div>
+        <iq-forum id="MaintenanceForum" title="Maintenance Forum"></iq-forum>
+
+        <form asp-action="CreateForumThread" method="post" class="mt-4">
+            <input type="hidden" name="forumId" value="MaintenanceForum" />
+
+            @if (TempData["ForumThreadCreated"] is string forumMessage)
+            {
+                <div class="alert alert-success" role="status">@forumMessage</div>
+            }
+
+            <div class="mb-3">
+                <label for="forum-thread-title" class="form-label">Title</label>
+                <input id="forum-thread-title" name="title" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label for="forum-thread-body" class="form-label">Body</label>
+                <textarea id="forum-thread-body" name="body" class="form-control" rows="3" required></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="forum-thread-labels" class="form-label">Labels</label>
+                <input id="forum-thread-labels" name="labels" class="form-control" placeholder="Maintenance, Safety" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add thread</button>
+        </form>
+    </div>
+</div>

@@ -1,5 +1,6 @@
 using WorkplaceIQ.Containers;
-using WorkplaceIQ.Feeds;
+using WorkplaceIQ.Labels;
+using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ;
 
@@ -16,7 +17,14 @@ public interface IWorkplaceIqStore
         string title,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<FeedPost>> GetFeedPostsAsync(
+    Task<IReadOnlyList<Post>> GetPostsAsync(
         Guid containerId,
+        CancellationToken cancellationToken = default);
+
+    Task<Post> CreatePostAsync(
+        Guid containerId,
+        string title,
+        string body,
+        IReadOnlyList<LabelName> labels,
         CancellationToken cancellationToken = default);
 }

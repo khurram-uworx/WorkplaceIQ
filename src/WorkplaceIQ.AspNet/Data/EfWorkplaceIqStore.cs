@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using WorkplaceIQ;
 using WorkplaceIQ.Containers;
-using WorkplaceIQ.Feeds;
+using WorkplaceIQ.Labels;
+using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.AspNet.Data;
 
@@ -41,14 +42,66 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         return container;
     }
 
-    public async Task<IReadOnlyList<FeedPost>> GetFeedPostsAsync(
+    public async Task<IReadOnlyList<Post>> GetPostsAsync(
         Guid containerId,
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.FeedPosts
+        var posts = await dbContext.Posts
             .AsNoTracking()
+            .Include(post => post.PostLabels)
+                .ThenInclude(postLabel => postLabel.Label)
             .Where(post => post.ContainerId == containerId)
-            .OrderByDescending(post => post.CreatedAt)
             .ToListAsync(cancellationToken);
+
+        return posts
+            .OrderByDescending(post => post.CreatedAt)
+            .ToList();
+    }
+
+    public async Task<Post> CreatePostAsync(
+        Guid containerId,
+        string title,
+        string body,
+        IReadOnlyList<LabelName> labels,
+        CancellationToken cancellationToken = default)
+    {
+        var post = new Post
+        {
+            ContainerId = containerId,
+            Title = title,
+            Body = body,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        dbContext.Posts.Add(post);
+
+        foreach (var labelName in labels)
+        {
+            var label = await dbContext.Labels.FirstOrDefaultAsync(
+                candidate => candidate.NormalizedName == labelName.NormalizedName,
+                cancellationToken);
+
+            if (label is null)
+            {
+                label = new Label
+                {
+                    Name = labelName.Name,
+                    NormalizedName = labelName.NormalizedName,
+                    Slug = labelName.Slug,
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                dbContext.Labels.Add(label);
+            }
+
+            post.PostLabels.Add(new PostLabel
+            {
+                Post = post,
+                Label = label
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return post;
     }
 }

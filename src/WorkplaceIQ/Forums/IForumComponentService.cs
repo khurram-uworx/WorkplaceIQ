@@ -1,15 +1,15 @@
 using WorkplaceIQ.Posts;
 
-namespace WorkplaceIQ.Feeds;
+namespace WorkplaceIQ.Forums;
 
-public interface IFeedComponentService
+public interface IForumComponentService
 {
-    Task<FeedComponentResult> ResolveFeedAsync(
-        FeedComponentRequest request,
+    Task<ForumComponentResult> ResolveForumAsync(
+        ForumComponentRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<Post> CreatePostAsync(
-        string feedId,
+    Task<Post> CreateThreadAsync(
+        string forumId,
         string title,
         string body,
         string? labels = null,

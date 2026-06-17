@@ -122,17 +122,17 @@ WorkplaceIQ uses ASP.NET Razor Components and Tag Helpers to compose application
 Example:
 
 ```html
-<wpi-feed id="PowerOutages"
-          title="Power Outages"
-          allow-comments="true" />
+<iq-feed id="PowerOutages"
+         title="Power Outages"
+         allow-comments="true" />
 
-<wpi-forum id="Maintenance"
-           title="Maintenance Discussions" />
+<iq-forum id="Maintenance"
+          title="Maintenance Discussions" />
 
-<wpi-files id="SafetyDocuments"
-           title="Safety Documents" />
+<iq-files id="SafetyDocuments"
+          title="Safety Documents" />
 
-<wpi-entity type="Machine" />
+<iq-entity type="Machine" />
 ```
 
 Behind the scenes the platform provisions:
@@ -155,7 +155,7 @@ Behind the scenes the platform provisions:
 Activity streams and announcements.
 
 ```html
-<wpi-feed />
+<iq-feed />
 ```
 
 ### Forums
@@ -163,7 +163,7 @@ Activity streams and announcements.
 Discussion and collaboration.
 
 ```html
-<wpi-forum />
+<iq-forum />
 ```
 
 ### Files
@@ -171,7 +171,7 @@ Discussion and collaboration.
 Document management.
 
 ```html
-<wpi-files />
+<iq-files />
 ```
 
 ### Entities
@@ -179,9 +179,9 @@ Document management.
 Business objects.
 
 ```html
-<wpi-entity type="Customer" />
-<wpi-entity type="Machine" />
-<wpi-entity type="Project" />
+<iq-entity type="Customer" />
+<iq-entity type="Machine" />
+<iq-entity type="Project" />
 ```
 
 ### Dashboards
@@ -189,7 +189,7 @@ Business objects.
 Metric and insight visualization.
 
 ```html
-<wpi-dashboard />
+<iq-dashboard />
 ```
 
 ### AI Chat
@@ -197,7 +197,7 @@ Metric and insight visualization.
 Chat with content.
 
 ```html
-<wpi-chat source="PowerOutages" />
+<iq-ai-chat source="PowerOutages" />
 ```
 
 ---

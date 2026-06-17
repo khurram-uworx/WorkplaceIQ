@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using WorkplaceIQ.Labels;
 
-namespace WorkplaceIQ.Feeds;
+namespace WorkplaceIQ.Posts;
 
-public sealed class FeedPost
+public sealed class Post
 {
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -17,4 +18,6 @@ public sealed class FeedPost
     public string Body { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public ICollection<PostLabel> PostLabels { get; set; } = [];
 }

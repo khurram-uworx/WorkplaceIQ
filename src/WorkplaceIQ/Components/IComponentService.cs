@@ -1,15 +1,17 @@
 using WorkplaceIQ.Posts;
 
-namespace WorkplaceIQ.Feeds;
+namespace WorkplaceIQ.Components;
 
-public interface IFeedComponentService
+public interface IComponentService
 {
-    Task<FeedComponentResult> ResolveFeedAsync(
-        FeedComponentRequest request,
+    Task<ComponentResult> ResolveAsync(
+        ComponentRequest request,
         CancellationToken cancellationToken = default);
 
     Task<Post> CreatePostAsync(
-        string feedId,
+        string componentId,
+        string containerType,
+        string componentName,
         string title,
         string body,
         string? labels = null,
