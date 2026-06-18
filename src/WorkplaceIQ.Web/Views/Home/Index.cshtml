@@ -5,8 +5,17 @@
 <h1 class="mb-4">WorkplaceIQ Demo</h1>
 
 <div class="iq-metrics-row mb-4">
-    <iq-metric name="OutageCountLast7Days" source="PowerOutages" />
-    <iq-metric name="TotalOutageTimeLast7Days" source="PowerOutages" />
+    <iq-metric name="workplaceiq.container.content.count"
+               source="PowerOutages"
+               content-type="Outage"
+               window="last_7_days" />
+    <iq-metric name="workplaceiq.metadata.sum"
+               source="PowerOutages"
+               content-type="Outage"
+               source-field="durationSeconds"
+               window="last_7_days"
+               unit="seconds"
+               display-unit="hours" />
 </div>
 
 <div class="iq-demo-grid">

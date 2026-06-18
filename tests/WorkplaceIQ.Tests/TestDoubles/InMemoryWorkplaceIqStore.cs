@@ -28,6 +28,17 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
             container.Key == key && container.Type == type));
     }
 
+    public Task<IReadOnlyList<Container>> GetContainersAsync(
+        string? type = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<Container>>(
+            Containers
+                .Where(container => string.IsNullOrWhiteSpace(type) || container.Type == type)
+                .OrderBy(container => container.Title)
+                .ToList());
+    }
+
     public Task<Container> CreateContainerAsync(
         string key,
         string type,

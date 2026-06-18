@@ -13,6 +13,10 @@ public interface IWorkplaceIqStore
         string type,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Container>> GetContainersAsync(
+        string? type = null,
+        CancellationToken cancellationToken = default);
+
     Task<Container> CreateContainerAsync(
         string key,
         string type,
