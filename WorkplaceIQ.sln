@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.8.11912.234 insiders
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
@@ -16,6 +16,21 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkplaceIQ.AspNet", "src\WorkplaceIQ.AspNet\WorkplaceIQ.AspNet.csproj", "{F5964216-7EE8-447E-B429-BE9AD69F3ED7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkplaceIQ.ServiceDefaults", "src\WorkplaceIQ.ServiceDefaults\WorkplaceIQ.ServiceDefaults.csproj", "{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{BF11F488-A38B-40D0-B53A-25098150760F}"
+	ProjectSection(SolutionItems) = preProject
+		.dockerignore = .dockerignore
+		.editorconfig = .editorconfig
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
+		.mcp.json = .mcp.json
+		AGENTS.md = AGENTS.md
+		docker-compose.yml = docker-compose.yml
+		Dockerfile = Dockerfile
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkplaceIQ.AppHost", "src\WorkplaceIQ.AppHost\WorkplaceIQ.AppHost.csproj", "{0EAD3D74-10F7-2489-652B-4F7DC02961EC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -87,6 +102,18 @@ Global
 		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|x64.Build.0 = Release|Any CPU
 		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|x86.ActiveCfg = Release|Any CPU
 		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|x86.Build.0 = Release|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Debug|x64.Build.0 = Debug|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Debug|x86.Build.0 = Debug|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Release|x64.ActiveCfg = Release|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Release|x64.Build.0 = Release|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Release|x86.ActiveCfg = Release|Any CPU
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -97,5 +124,6 @@ Global
 		{79F80724-6620-42B8-88E7-659EADD92D5A} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{F5964216-7EE8-447E-B429-BE9AD69F3ED7} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{0EAD3D74-10F7-2489-652B-4F7DC02961EC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
