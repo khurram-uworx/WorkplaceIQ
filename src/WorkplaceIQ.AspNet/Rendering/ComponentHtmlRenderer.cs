@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Encodings.Web;
 using WorkplaceIQ.Content;
+using WorkplaceIQ.Entities;
+using WorkplaceIQ.Files;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.AspNet.Rendering;
@@ -34,6 +36,147 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
             [],
             "No forum threads yet.",
             interactions);
+    }
+
+    public string RenderFiles(
+        string displayTitle,
+        IReadOnlyList<FileObject> files,
+        ComponentInteractionOptions interactions)
+    {
+        var html = new StringBuilder();
+        html.Append("<header class=\"iq-files__header\"><h2 class=\"iq-files__title\">");
+        html.Append(htmlEncoder.Encode(displayTitle));
+        html.Append("</h2></header>");
+
+        if (files.Count == 0)
+        {
+            html.Append("<p class=\"iq-files__empty\">No files yet.</p>");
+            return html.ToString();
+        }
+
+        html.Append("<ul class=\"iq-files__items\">");
+
+        foreach (var file in files)
+        {
+            var content = file.ContentItem;
+            var record = file.FileRecord;
+            html.Append("<li class=\"iq-files__item\" data-iq-item-type=\"content\" data-iq-item-id=\"");
+            html.Append(content.Id);
+            html.Append("\"><article class=\"iq-files__row\"><div class=\"iq-files__icon\" aria-hidden=\"true\">");
+            html.Append(RenderFileIcon(record.FileName));
+            html.Append("</div><div class=\"iq-files__main\"><h3 class=\"iq-files__item-title\">");
+            html.Append(htmlEncoder.Encode(content.Title));
+            html.Append("</h3>");
+
+            if (!string.IsNullOrWhiteSpace(content.Body))
+            {
+                html.Append("<p class=\"iq-files__item-body\">");
+                html.Append(htmlEncoder.Encode(content.Body));
+                html.Append("</p>");
+            }
+
+            html.Append("<p class=\"iq-files__meta\">");
+            html.Append(htmlEncoder.Encode(GetFileExtension(record.FileName)));
+            html.Append(" · ");
+            html.Append(htmlEncoder.Encode(FormatSize(record.SizeBytes)));
+            html.Append(" · Updated ");
+            html.Append(htmlEncoder.Encode(content.UpdatedAt.ToString("MMM d, yyyy")));
+            html.Append("</p>");
+
+            html.Append(labelHtmlRenderer.RenderContentLabels(content.ContentLabels));
+            html.Append(RenderComments("iq-files", content.Posts));
+            html.Append(RenderFileActions(content, interactions));
+            html.Append("</div></article></li>");
+        }
+
+        html.Append("</ul>");
+        return html.ToString();
+    }
+
+    public string RenderEntities(
+        string displayTitle,
+        string entityType,
+        IReadOnlyList<BusinessEntity> entities)
+    {
+        var html = new StringBuilder();
+        html.Append("<header class=\"iq-entity-list__header\"><h2 class=\"iq-entity-list__title\">");
+        html.Append(htmlEncoder.Encode(displayTitle));
+        html.Append("</h2></header>");
+
+        if (entities.Count == 0)
+        {
+            html.Append("<p class=\"iq-entity-list__empty\">No ");
+            html.Append(htmlEncoder.Encode(entityType.ToLowerInvariant()));
+            html.Append(" entities yet.</p>");
+            return html.ToString();
+        }
+
+        html.Append("<ul class=\"iq-entity-list__items\">");
+
+        foreach (var entity in entities)
+        {
+            html.Append("<li class=\"iq-entity-list__item\" data-iq-item-type=\"entity\" data-iq-item-id=\"");
+            html.Append(entity.Id);
+            html.Append("\">");
+            html.Append(RenderEntity(entity));
+            html.Append("</li>");
+        }
+
+        html.Append("</ul>");
+        return html.ToString();
+    }
+
+    public string RenderEntity(BusinessEntity entity)
+    {
+        var html = new StringBuilder();
+        html.Append("<article class=\"iq-entity\"><div class=\"iq-entity__main\"><p class=\"iq-entity__type\">");
+        html.Append(htmlEncoder.Encode(entity.EntityType));
+        html.Append("</p><h3 class=\"iq-entity__title\">");
+        html.Append(htmlEncoder.Encode(entity.Title));
+        html.Append("</h3>");
+
+        if (!string.IsNullOrWhiteSpace(entity.Description))
+        {
+            html.Append("<p class=\"iq-entity__description\">");
+            html.Append(htmlEncoder.Encode(entity.Description));
+            html.Append("</p>");
+        }
+
+        html.Append("<p class=\"iq-entity__meta\">");
+        html.Append(htmlEncoder.Encode(entity.Status));
+
+        if (!string.IsNullOrWhiteSpace(entity.MetadataJson))
+        {
+            html.Append(" · Metadata");
+        }
+
+        html.Append("</p>");
+        html.Append(labelHtmlRenderer.RenderEntityLabels(entity.EntityLabels));
+
+        var relationships = entity.SourceRelationships
+            .Where(relationship => relationship.TargetEntity is not null)
+            .OrderBy(relationship => relationship.RelationshipType)
+            .ThenBy(relationship => relationship.TargetEntity!.Title)
+            .ToList();
+
+        if (relationships.Count > 0)
+        {
+            html.Append("<ul class=\"iq-entity__relationships\" aria-label=\"Relationships\">");
+
+            foreach (var relationship in relationships)
+            {
+                html.Append("<li class=\"iq-entity__relationship\"><span>");
+                html.Append(htmlEncoder.Encode(relationship.RelationshipType));
+                html.Append("</span> ");
+                html.Append(htmlEncoder.Encode(relationship.TargetEntity!.Title));
+                html.Append("</li>");
+            }
+
+            html.Append("</ul>");
+        }
+
+        html.Append("</div></article>");
+        return html.ToString();
     }
 
     private string Render(
@@ -181,6 +324,52 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         return html.ToString();
     }
 
+    private string RenderFileActions(
+        ContentItem item,
+        ComponentInteractionOptions interactions)
+    {
+        var html = new StringBuilder();
+        html.Append("<div class=\"iq-files__item-actions\">");
+        AppendFileDownloadButton(html, item.Id, item.Title);
+
+        if (interactions.AllowComment)
+        {
+            AppendActionButton(html, "iq-files", "comment", "Comment", "content", item.Id, item.Title, item.Body);
+        }
+
+        if (interactions.AllowLabel)
+        {
+            AppendActionButton(html, "iq-files", "label", "Label", "content", item.Id, item.Title, item.Body);
+        }
+
+        if (interactions.AllowEdit)
+        {
+            AppendActionButton(html, "iq-files", "edit", "Edit", "content", item.Id, item.Title, item.Body);
+        }
+
+        if (interactions.AllowDelete)
+        {
+            AppendActionButton(html, "iq-files", "delete", "Delete", "content", item.Id, item.Title, item.Body);
+        }
+
+        html.Append("</div>");
+        return html.ToString();
+    }
+
+    private void AppendFileDownloadButton(
+        StringBuilder html,
+        Guid itemId,
+        string title)
+    {
+        html.Append("<a class=\"iq-files__item-action\" href=\"/Files/Download/");
+        html.Append(itemId);
+        html.Append("\" aria-label=\"Download ");
+        html.Append(htmlEncoder.Encode(title));
+        html.Append("\" title=\"Download\">");
+        html.Append(RenderIcon("download"));
+        html.Append("<span class=\"visually-hidden\">Download</span></a>");
+    }
+
     private void AppendActionButton(
         StringBuilder html,
         string blockClass,
@@ -223,6 +412,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
             "label" => "<path d=\"M3 11.5V4h7.5L21 14.5 14.5 21 4 10.5Z\"/><path d=\"M7.5 7.5h.01\"/>",
             "edit" => "<path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"/>",
             "delete" => "<path d=\"M4 7h16\"/><path d=\"M10 11v6\"/><path d=\"M14 11v6\"/><path d=\"M6 7l1 14h10l1-14\"/><path d=\"M9 7V4h6v3\"/>",
+            "download" => "<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"M7 10l5 5 5-5\"/><path d=\"M12 15V3\"/>",
             _ => string.Empty
         };
 
@@ -260,5 +450,34 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
 
         html.Append("</ul>");
         return html.ToString();
+    }
+
+    private static string GetFileExtension(string fileName)
+    {
+        var extension = Path.GetExtension(fileName);
+        return string.IsNullOrWhiteSpace(extension)
+            ? "FILE"
+            : extension.TrimStart('.').ToUpperInvariant();
+    }
+
+    private static string FormatSize(long sizeBytes)
+    {
+        if (sizeBytes < 1024)
+        {
+            return $"{sizeBytes} B";
+        }
+
+        if (sizeBytes < 1024 * 1024)
+        {
+            return $"{sizeBytes / 1024d:0.#} KB";
+        }
+
+        return $"{sizeBytes / 1024d / 1024d:0.#} MB";
+    }
+
+    private string RenderFileIcon(string fileName)
+    {
+        var extension = GetFileExtension(fileName);
+        return $"<span class=\"iq-files__file-ext\">{htmlEncoder.Encode(extension)}</span>";
     }
 }

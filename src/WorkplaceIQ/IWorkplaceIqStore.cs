@@ -1,5 +1,7 @@
 using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
+using WorkplaceIQ.Entities;
+using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Posts;
@@ -71,8 +73,42 @@ public interface IWorkplaceIqStore
         Guid contentItemId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<FileObject>> GetFilesByContainerAsync(
+        Guid containerId,
+        CancellationToken cancellationToken = default);
+
+    Task<FileObject?> GetFileByContentIdAsync(
+        Guid contentItemId,
+        CancellationToken cancellationToken = default);
+
+    Task<FileObject> CreateFileRecordAsync(
+        FileRecord fileRecord,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<BusinessEntity>> GetEntitiesByContainerAsync(
+        Guid containerId,
+        CancellationToken cancellationToken = default);
+
+    Task<BusinessEntity?> GetEntityByIdAsync(
+        Guid entityId,
+        CancellationToken cancellationToken = default);
+
+    Task<BusinessEntity> CreateEntityAsync(
+        BusinessEntity entity,
+        IReadOnlyList<LabelName> labels,
+        CancellationToken cancellationToken = default);
+
+    Task<EntityRelationship> CreateEntityRelationshipAsync(
+        EntityRelationship relationship,
+        CancellationToken cancellationToken = default);
+
     Task AddLabelToContentAsync(
         Guid contentItemId,
+        LabelName label,
+        CancellationToken cancellationToken = default);
+
+    Task AddLabelToEntityAsync(
+        Guid entityId,
         LabelName label,
         CancellationToken cancellationToken = default);
 

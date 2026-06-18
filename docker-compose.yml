@@ -1,0 +1,37 @@
+services:
+  workplaceiq-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:4792
+      ConnectionStrings__WorkplaceIQ: Data Source=/app/App_Data/workplaceiq.dev.db
+      WorkplaceIQ__Storage__Provider: MinIO
+      WorkplaceIQ__Storage__Endpoint: http://minio:9000
+      WorkplaceIQ__Storage__BucketName: workplaceiq-files
+      WorkplaceIQ__Storage__AccessKey: workplaceiq
+      WorkplaceIQ__Storage__SecretKey: workplaceiq-secret
+      WorkplaceIQ__Storage__UseSsl: "false"
+    ports:
+      - "4792:4792"
+    volumes:
+      - workplaceiq-data:/app/App_Data
+    depends_on:
+      - minio
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: workplaceiq
+      MINIO_ROOT_PASSWORD: workplaceiq-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+volumes:
+  workplaceiq-data:
+  minio-data:

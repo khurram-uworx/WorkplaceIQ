@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Encodings.Web;
 using WorkplaceIQ.Content;
+using WorkplaceIQ.Entities;
 using WorkplaceIQ.Labels;
 
 namespace WorkplaceIQ.AspNet.Rendering;
@@ -18,6 +19,13 @@ public sealed class LabelHtmlRenderer(HtmlEncoder htmlEncoder)
     {
         return RenderLabels(contentLabels
             .Select(contentLabel => contentLabel.Label)
+            .Where(label => label is not null)!);
+    }
+
+    public string RenderEntityLabels(IEnumerable<EntityLabel> entityLabels)
+    {
+        return RenderLabels(entityLabels
+            .Select(entityLabel => entityLabel.Label)
             .Where(label => label is not null)!);
     }
 
