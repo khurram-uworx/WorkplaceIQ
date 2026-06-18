@@ -1,15 +1,14 @@
-namespace WorkplaceIQ.Tests.TagHelpers;
-
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Text.Encodings.Web;
 using WorkplaceIQ.AspNet.Rendering;
 using WorkplaceIQ.AspNet.TagHelpers;
-using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Posts;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.TagHelpers;
 
 public class FilesTagHelperTests
 {
@@ -18,16 +17,16 @@ public class FilesTagHelperTests
     {
         var contentId = Guid.NewGuid();
         var service = new RecordingFileComponentService(new FileComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "HRDocs",
-                Type = ContainerTypes.Files,
+                Name = "HRDocs",
+                ContentType = ContentTypes.FileContainer,
                 Title = "HR Documents"
             },
             [
                 new FileObject(
-                    new ContentItem
+                    new Content.Content
                     {
                         Id = contentId,
                         Title = "Leave Policy",
@@ -57,7 +56,7 @@ public class FilesTagHelperTests
                     },
                     new FileRecord
                     {
-                        ContentItemId = contentId,
+                        ContentId = contentId,
                         FileName = "Leave Policy.pdf",
                         ContentType = "application/pdf",
                         SizeBytes = 2048,
@@ -100,11 +99,11 @@ public class FilesTagHelperTests
     public async Task ProcessAsync_RendersEmptyStateWhenFilesLibraryHasNoFiles()
     {
         var service = new RecordingFileComponentService(new FileComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "ITDocs",
-                Type = ContainerTypes.Files,
+                Name = "ITDocs",
+                ContentType = ContentTypes.FileContainer,
                 Title = "IT Documents"
             },
             [],
@@ -127,16 +126,16 @@ public class FilesTagHelperTests
     public async Task ProcessAsync_EncodesFileContent()
     {
         var service = new RecordingFileComponentService(new FileComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "HRDocs",
-                Type = ContainerTypes.Files,
+                Name = "HRDocs",
+                ContentType = ContentTypes.FileContainer,
                 Title = "<HR>"
             },
             [
                 new FileObject(
-                    new ContentItem
+                    new Content.Content
                     {
                         Id = Guid.NewGuid(),
                         Title = "<Policy>",

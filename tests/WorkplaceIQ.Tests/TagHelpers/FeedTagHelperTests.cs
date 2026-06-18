@@ -1,15 +1,14 @@
-namespace WorkplaceIQ.Tests.TagHelpers;
-
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Text.Encodings.Web;
 using WorkplaceIQ.AspNet.Rendering;
 using WorkplaceIQ.AspNet.TagHelpers;
-using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Feeds;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Posts;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.TagHelpers;
 
 public class FeedTagHelperTests
 {
@@ -17,11 +16,11 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_ResolvesFeedByIdAndRendersTitleAndPosts()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "CompanyNews",
-                Type = ContainerTypes.Feed,
+                Name = "CompanyNews",
+                ContentType = ContentTypes.FeedContainer,
                 Title = "News Feed"
             },
             [
@@ -77,11 +76,11 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_RendersEmptyStateWhenFeedHasNoPosts()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "CompanyNews",
-                Type = ContainerTypes.Feed,
+                Name = "CompanyNews",
+                ContentType = ContentTypes.FeedContainer,
                 Title = "News Feed"
             },
             [],
@@ -107,11 +106,11 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_EncodesTitleAndPostContent()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "CompanyNews",
-                Type = ContainerTypes.Feed,
+                Name = "CompanyNews",
+                ContentType = ContentTypes.FeedContainer,
                 Title = "<News>"
             },
             [
@@ -163,16 +162,16 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_RendersContentItemsInFeed()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "PowerOutages",
-                Type = ContainerTypes.Feed,
+                Name = "PowerOutages",
+                ContentType = ContentTypes.FeedContainer,
                 Title = "Power Outages"
             },
             [],
             [
-                new ContentItem
+                new Content.Content
                 {
                     Title = "Generator 3 outage",
                     Body = "Generator 3 lost power."
@@ -200,16 +199,16 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_SystemManagedFeedDisablesMutationActionsButAllowsCommentAndLabel()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "PowerOutages",
-                Type = ContainerTypes.Feed,
+                Name = "PowerOutages",
+                ContentType = ContentTypes.FeedContainer,
                 Title = "Power Outages"
             },
             [],
             [
-                new ContentItem
+                new Content.Content
                 {
                     Title = "Generator 3 outage",
                     Body = "Generator 3 lost power."
@@ -246,11 +245,11 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_DisableAttributesRemoveSpecificInteractions()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "CompanyNews",
-                Type = ContainerTypes.Feed,
+                Name = "CompanyNews",
+                ContentType = ContentTypes.FeedContainer,
                 Title = "News Feed"
             },
             [

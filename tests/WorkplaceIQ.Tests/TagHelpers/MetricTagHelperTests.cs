@@ -1,11 +1,11 @@
-namespace WorkplaceIQ.Tests.TagHelpers;
-
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using WorkplaceIQ.AspNet.TagHelpers;
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.TagHelpers;
 
 public class MetricTagHelperTests
 {
@@ -13,7 +13,12 @@ public class MetricTagHelperTests
     public async Task ProcessAsync_BuildsMetricRequestFromAttributes()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var container = await store.CreateContainerAsync("PowerOutages", ContainerTypes.Feed, "Power Outages");
+        var container = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "PowerOutages",
+            ContentType = ContentTypes.FeedContainer,
+            Title = "Power Outages"
+        });
         var metricService = new RecordingMetricService(new MetricResult(
             MetricNames.ContainerContentCount,
             12,
@@ -35,7 +40,7 @@ public class MetricTagHelperTests
 
         Assert.That(metricService.Request?.Name, Is.EqualTo(MetricNames.ContainerContentCount));
         Assert.That(metricService.Request?.ContainerId, Is.EqualTo(container.Id));
-        Assert.That(metricService.Request?.ContainerType, Is.EqualTo(ContainerTypes.Feed));
+        Assert.That(metricService.Request?.ContainerType, Is.EqualTo("feed"));
         Assert.That(metricService.Request?.ContentType, Is.EqualTo("Outage"));
         Assert.That(metricService.Request?.Window, Is.EqualTo("last_7_days"));
         Assert.That(output.Content.GetContent(), Does.Contain("<span class=\"iq-metric__value\">12</span>"));

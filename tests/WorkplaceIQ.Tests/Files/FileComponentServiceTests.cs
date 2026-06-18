@@ -1,10 +1,10 @@
-namespace WorkplaceIQ.Tests.Files;
-
 using System.Text;
 using WorkplaceIQ.Components;
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.Files;
 
 public class FileComponentServiceTests
 {
@@ -21,8 +21,8 @@ public class FileComponentServiceTests
 
         Assert.That(result.Created, Is.True);
         Assert.That(result.DisplayTitle, Is.EqualTo("HR Documents"));
-        Assert.That(store.Containers.Single().Key, Is.EqualTo("HRDocs"));
-        Assert.That(store.Containers.Single().Type, Is.EqualTo(ContainerTypes.Files));
+        Assert.That(store.Contents.Single().Name, Is.EqualTo("HRDocs"));
+        Assert.That(store.Contents.Single().ContentType, Is.EqualTo(ContentTypes.FileContainer));
     }
 
     [Test]
@@ -31,7 +31,12 @@ public class FileComponentServiceTests
         var store = new InMemoryWorkplaceIqStore();
         var storage = new InMemoryFileObjectStorage();
         var service = CreateService(store, storage);
-        await store.CreateContainerAsync("HRDocs", ContainerTypes.Files, "HR Documents");
+        await store.CreateContentAsync(new Content.Content
+        {
+            Name = "HRDocs",
+            ContentType = ContentTypes.FileContainer,
+            Title = "HR Documents"
+        });
         await using var content = new MemoryStream(Encoding.UTF8.GetBytes("policy"));
 
         var file = await service.UploadAsync(new FileUploadRequest(
@@ -45,14 +50,14 @@ public class FileComponentServiceTests
             Labels: "HR, Policy"));
 
         Assert.That(storage.BucketEnsured, Is.True);
-        Assert.That(file.ContentItem.ContentType, Is.EqualTo(FileContentTypes.File));
-        Assert.That(file.ContentItem.Title, Is.EqualTo("Leave Policy"));
-        Assert.That(file.ContentItem.Body, Is.EqualTo("Annual leave rules"));
+        Assert.That(file.Content.ContentType, Is.EqualTo(FileContentTypes.File));
+        Assert.That(file.Content.Title, Is.EqualTo("Leave Policy"));
+        Assert.That(file.Content.Body, Is.EqualTo("Annual leave rules"));
         Assert.That(file.FileRecord.FileName, Is.EqualTo("Leave Policy.pdf"));
         Assert.That(file.FileRecord.BucketName, Is.EqualTo("test-files"));
         Assert.That(file.FileRecord.ObjectKey, Does.Contain("containers/HRDocs/content/"));
         Assert.That(storage.Objects[file.FileRecord.ObjectKey], Is.EqualTo(Encoding.UTF8.GetBytes("policy")));
-        Assert.That(file.ContentItem.ContentLabels.Select(label => label.Label!.Slug), Is.EquivalentTo(new[] { "hr", "policy" }));
+        Assert.That(file.Content.ContentLabels.Select(label => label.Label!.Slug), Is.EquivalentTo(new[] { "hr", "policy" }));
     }
 
     [Test]
@@ -61,8 +66,18 @@ public class FileComponentServiceTests
         var store = new InMemoryWorkplaceIqStore();
         var storage = new InMemoryFileObjectStorage();
         var service = CreateService(store, storage);
-        await store.CreateContainerAsync("HRDocs", ContainerTypes.Files, "HR Documents");
-        await store.CreateContainerAsync("ITDocs", ContainerTypes.Files, "IT Documents");
+        await store.CreateContentAsync(new Content.Content
+        {
+            Name = "HRDocs",
+            ContentType = ContentTypes.FileContainer,
+            Title = "HR Documents"
+        });
+        await store.CreateContentAsync(new Content.Content
+        {
+            Name = "ITDocs",
+            ContentType = ContentTypes.FileContainer,
+            Title = "IT Documents"
+        });
 
         await UploadTextAsync(service, "HRDocs", "Leave.pdf");
         await UploadTextAsync(service, "ITDocs", "Vpn.pdf");
@@ -78,10 +93,15 @@ public class FileComponentServiceTests
         var store = new InMemoryWorkplaceIqStore();
         var storage = new InMemoryFileObjectStorage();
         var service = CreateService(store, storage);
-        await store.CreateContainerAsync("HRDocs", ContainerTypes.Files, "HR Documents");
+        await store.CreateContentAsync(new Content.Content
+        {
+            Name = "HRDocs",
+            ContentType = ContentTypes.FileContainer,
+            Title = "HR Documents"
+        });
         var uploaded = await UploadTextAsync(service, "HRDocs", "Leave.pdf", "stored");
 
-        await using var stream = await service.OpenReadAsync(uploaded.ContentItem.Id);
+        await using var stream = await service.OpenReadAsync(uploaded.Content.Id);
         using var reader = new StreamReader(stream);
 
         Assert.That(await reader.ReadToEndAsync(), Is.EqualTo("stored"));

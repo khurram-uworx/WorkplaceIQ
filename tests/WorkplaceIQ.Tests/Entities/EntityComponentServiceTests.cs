@@ -1,9 +1,10 @@
-namespace WorkplaceIQ.Tests.Entities;
-
 using WorkplaceIQ.Components;
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Entities;
+using WorkplaceIQ.Labels;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.Entities;
 
 public class EntityComponentServiceTests
 {
@@ -22,7 +23,7 @@ public class EntityComponentServiceTests
         Assert.That(result.Created, Is.True);
         Assert.That(result.DisplayTitle, Is.EqualTo("Machines"));
         Assert.That(result.EntityType, Is.EqualTo("Machine"));
-        Assert.That(store.Containers.Single().Type, Is.EqualTo(ContainerTypes.EntityList));
+        Assert.That(store.Contents.Single().ContentType, Is.EqualTo(ContentTypes.EntityContainer));
     }
 
     [Test]
@@ -30,7 +31,12 @@ public class EntityComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateService(store);
-        await store.CreateContainerAsync("Machines", ContainerTypes.EntityList, "Machines");
+        await store.CreateContentAsync(new Content.Content
+        {
+            Name = "Machines",
+            ContentType = ContentTypes.EntityContainer,
+            Title = "Machines"
+        });
 
         var entity = await service.CreateEntityAsync(new EntityCreateRequest(
             "Machines",
@@ -41,10 +47,10 @@ public class EntityComponentServiceTests
             MetadataJson: """{"floor":"A"}""",
             Labels: "Production, Critical"));
 
-        Assert.That(entity.EntityType, Is.EqualTo("Machine"));
+        Assert.That(entity.ContentType, Is.EqualTo("Machine"));
         Assert.That(entity.Name, Is.EqualTo("press-12"));
         Assert.That(entity.MetadataJson, Is.EqualTo("""{"floor":"A"}"""));
-        Assert.That(entity.EntityLabels.Select(label => label.Label!.Slug), Is.EquivalentTo(new[] { "production", "critical" }));
+        Assert.That(entity.ContentLabels.Select(label => label.Label!.Slug), Is.EquivalentTo(new[] { "production", "critical" }));
         Assert.That(store.Labels, Has.Count.EqualTo(2));
     }
 
@@ -53,10 +59,32 @@ public class EntityComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateService(store);
-        var machines = await store.CreateContainerAsync("Machines", ContainerTypes.EntityList, "Machines");
-        var customers = await store.CreateContainerAsync("Customers", ContainerTypes.EntityList, "Customers");
-        await store.CreateEntityAsync(new BusinessEntity { ContainerId = machines.Id, EntityType = "Machine", Name = "press-12", Title = "Press 12" }, []);
-        await store.CreateEntityAsync(new BusinessEntity { ContainerId = customers.Id, EntityType = "Customer", Name = "acme", Title = "Acme" }, []);
+        var machines = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "Machines",
+            ContentType = ContentTypes.EntityContainer,
+            Title = "Machines"
+        });
+        var customers = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "Customers",
+            ContentType = ContentTypes.EntityContainer,
+            Title = "Customers"
+        });
+        await store.CreateContentAsync(new Content.Content
+        {
+            ParentId = machines.Id,
+            ContentType = "Machine",
+            Name = "press-12",
+            Title = "Press 12"
+        });
+        await store.CreateContentAsync(new Content.Content
+        {
+            ParentId = customers.Id,
+            ContentType = "Customer",
+            Name = "acme",
+            Title = "Acme"
+        });
 
         var result = await service.ResolveEntitiesAsync(new EntityComponentRequest(
             "Machines",
@@ -72,17 +100,34 @@ public class EntityComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateService(store);
-        var container = await store.CreateContainerAsync("Machines", ContainerTypes.EntityList, "Machines");
-        var source = await store.CreateEntityAsync(new BusinessEntity { ContainerId = container.Id, EntityType = "Machine", Name = "line-1", Title = "Line 1" }, []);
-        var target = await store.CreateEntityAsync(new BusinessEntity { ContainerId = container.Id, EntityType = "Machine", Name = "press-12", Title = "Press 12" }, []);
+        var container = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "Machines",
+            ContentType = ContentTypes.EntityContainer,
+            Title = "Machines"
+        });
+        var source = await store.CreateContentAsync(new Content.Content
+        {
+            ParentId = container.Id,
+            ContentType = "Machine",
+            Name = "line-1",
+            Title = "Line 1"
+        });
+        var target = await store.CreateContentAsync(new Content.Content
+        {
+            ParentId = container.Id,
+            ContentType = "Machine",
+            Name = "press-12",
+            Title = "Press 12"
+        });
 
         var relationship = await service.CreateRelationshipAsync(source.Id, target.Id, "contains", """{"slot":1}""");
 
-        Assert.That(relationship.SourceEntityId, Is.EqualTo(source.Id));
-        Assert.That(relationship.TargetEntityId, Is.EqualTo(target.Id));
+        Assert.That(relationship.SourceContentId, Is.EqualTo(source.Id));
+        Assert.That(relationship.TargetContentId, Is.EqualTo(target.Id));
         Assert.That(relationship.RelationshipType, Is.EqualTo("contains"));
         Assert.That(relationship.MetadataJson, Is.EqualTo("""{"slot":1}"""));
-        Assert.That(store.EntityRelationships, Has.Count.EqualTo(1));
+        Assert.That(store.ContentRelationships, Has.Count.EqualTo(1));
     }
 
     private static EntityComponentService CreateService(InMemoryWorkplaceIqStore store)

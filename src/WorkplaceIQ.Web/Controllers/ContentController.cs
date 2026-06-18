@@ -25,7 +25,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
         }
 
         await store.CreatePostAsync(
-            item.ContainerId,
+            item.ParentId!.Value,
             "Comment",
             body.Trim(),
             [],

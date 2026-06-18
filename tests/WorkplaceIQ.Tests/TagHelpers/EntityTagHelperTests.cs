@@ -1,35 +1,35 @@
-namespace WorkplaceIQ.Tests.TagHelpers;
-
-using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.Razor.TagHelpers;
 using WorkplaceIQ.AspNet.Rendering;
 using WorkplaceIQ.AspNet.TagHelpers;
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Entities;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.TagHelpers;
 
 public class EntityTagHelperTests
 {
     [Test]
     public async Task ProcessAsync_ResolvesEntityListAndRendersEntities()
     {
-        var target = new BusinessEntity
+        var target = new Content.Content
         {
             Id = Guid.NewGuid(),
-            EntityType = "Machine",
+            ContentType = "Machine",
             Title = "Line 1"
         };
-        var entity = new BusinessEntity
+        var entity = new Content.Content
         {
             Id = Guid.NewGuid(),
-            EntityType = "Machine",
+            ContentType = "Machine",
             Title = "Press 12",
             Description = "Hydraulic press",
             MetadataJson = """{"floor":"A"}""",
-            EntityLabels =
+            ContentLabels =
             [
-                new EntityLabel
+                new ContentLabel
                 {
                     Label = new Label
                     {
@@ -41,21 +41,26 @@ public class EntityTagHelperTests
             ],
             SourceRelationships =
             [
-                new EntityRelationship
+                new ContentRelationship
                 {
                     RelationshipType = "part of",
-                    TargetEntity = target
+                    TargetContent = target
                 }
             ]
         };
         var service = new RecordingEntityComponentService(new EntityComponentResult(
-            new Container { Key = "Machines", Type = ContainerTypes.EntityList, Title = "Machines" },
+            new Content.Content
+            {
+                Name = "Machines",
+                ContentType = ContentTypes.EntityContainer,
+                Title = "Machines"
+            },
             [entity],
             false,
             false,
             "Machines",
             "Machine"));
-        var tagHelper = new EntityTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
+        var tagHelper = new EntityListTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
         {
             Id = "Machines",
             Title = "Machines",
@@ -83,11 +88,16 @@ public class EntityTagHelperTests
     public async Task ProcessAsync_EncodesEntityContent()
     {
         var service = new RecordingEntityComponentService(new EntityComponentResult(
-            new Container { Key = "Machines", Type = ContainerTypes.EntityList, Title = "<Machines>" },
+            new Content.Content
+            {
+                Name = "Machines",
+                ContentType = ContentTypes.EntityContainer,
+                Title = "<Machines>"
+            },
             [
-                new BusinessEntity
+                new Content.Content
                 {
-                    EntityType = "<Machine>",
+                    ContentType = "<Machine>",
                     Title = "<Press>",
                     Description = "Use <iq-entity>"
                 }
@@ -96,7 +106,7 @@ public class EntityTagHelperTests
             false,
             "<Machines>",
             "<Machine>"));
-        var tagHelper = new EntityTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
+        var tagHelper = new EntityListTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
         {
             Id = "Machines",
             Title = "<Machines>",
@@ -118,13 +128,18 @@ public class EntityTagHelperTests
     public async Task ProcessAsync_RendersEmptyState()
     {
         var service = new RecordingEntityComponentService(new EntityComponentResult(
-            new Container { Key = "Machines", Type = ContainerTypes.EntityList, Title = "Machines" },
+            new Content.Content
+            {
+                Name = "Machines",
+                ContentType = ContentTypes.EntityContainer,
+                Title = "Machines"
+            },
             [],
             false,
             false,
             "Machines",
             "Machine"));
-        var tagHelper = new EntityTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
+        var tagHelper = new EntityListTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
         {
             Id = "Machines",
             Title = "Machines",

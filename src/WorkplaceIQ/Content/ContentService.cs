@@ -2,22 +2,22 @@ namespace WorkplaceIQ.Content;
 
 public sealed class ContentService(IWorkplaceIqStore store) : IContentService
 {
-    public Task<IReadOnlyList<ContentItem>> GetByContainerAsync(
-        Guid containerId,
+    public Task<IReadOnlyList<Content>> GetByParentAsync(
+        Guid parentId,
         CancellationToken cancellationToken = default)
     {
-        return store.GetContentByContainerAsync(containerId, cancellationToken);
+        return store.GetChildrenAsync(parentId, cancellationToken: cancellationToken);
     }
 
-    public Task<ContentItem?> GetByIdAsync(
-        Guid contentItemId,
+    public Task<Content?> GetByIdAsync(
+        Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        return store.GetContentByIdAsync(contentItemId, cancellationToken);
+        return store.GetContentByIdAsync(contentId, cancellationToken);
     }
 
-    public async Task<ContentItem> CreateAsync(
-        Guid containerId,
+    public async Task<Content> CreateAsync(
+        Guid parentId,
         string contentType,
         string name,
         string title,
@@ -27,9 +27,9 @@ public sealed class ContentService(IWorkplaceIqStore store) : IContentService
         CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
-        var item = new ContentItem
+        var item = new Content
         {
-            ContainerId = containerId,
+            ParentId = parentId,
             ContentType = contentType.Trim(),
             Name = name.Trim(),
             Title = title.Trim(),
@@ -44,16 +44,16 @@ public sealed class ContentService(IWorkplaceIqStore store) : IContentService
         return await store.CreateContentAsync(item, cancellationToken);
     }
 
-    public async Task<ContentItem> UpdateAsync(
-        Guid contentItemId,
+    public async Task<Content> UpdateAsync(
+        Guid contentId,
         string? title = null,
         string? body = null,
         string? status = null,
         string? metadataJson = null,
         CancellationToken cancellationToken = default)
     {
-        var item = await store.GetContentByIdAsync(contentItemId, cancellationToken)
-            ?? throw new InvalidOperationException($"Content item '{contentItemId}' not found.");
+        var item = await store.GetContentByIdAsync(contentId, cancellationToken)
+            ?? throw new InvalidOperationException($"Content item '{contentId}' not found.");
 
         if (title is not null) item.Title = title.Trim();
         if (body is not null) item.Body = body.Trim();

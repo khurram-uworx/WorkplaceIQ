@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Encodings.Web;
 using WorkplaceIQ.Content;
-using WorkplaceIQ.Entities;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Posts;
 
@@ -12,7 +11,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
     public string RenderFeed(
         string displayTitle,
         IReadOnlyList<Post> posts,
-        IReadOnlyList<ContentItem> contentItems,
+        IReadOnlyList<Content.Content> contentItems,
         ComponentInteractionOptions interactions)
     {
         return Render(
@@ -58,7 +57,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
 
         foreach (var file in files)
         {
-            var content = file.ContentItem;
+            var content = file.Content;
             var record = file.FileRecord;
             html.Append("<li class=\"iq-files__item\" data-iq-item-type=\"content\" data-iq-item-id=\"");
             html.Append(content.Id);
@@ -96,7 +95,8 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
     public string RenderEntities(
         string displayTitle,
         string entityType,
-        IReadOnlyList<BusinessEntity> entities)
+        IReadOnlyList<Content.Content> entities,
+        ComponentInteractionOptions interactions)
     {
         var html = new StringBuilder();
         html.Append("<header class=\"iq-entity-list__header\"><h2 class=\"iq-entity-list__title\">");
@@ -118,7 +118,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
             html.Append("<li class=\"iq-entity-list__item\" data-iq-item-type=\"entity\" data-iq-item-id=\"");
             html.Append(entity.Id);
             html.Append("\">");
-            html.Append(RenderEntity(entity));
+            html.Append(RenderEntityCard(entity, interactions));
             html.Append("</li>");
         }
 
@@ -126,11 +126,78 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         return html.ToString();
     }
 
-    public string RenderEntity(BusinessEntity entity)
+    public string RenderEntityDetail(Content.Content content)
+    {
+        var html = new StringBuilder();
+        html.Append("<article class=\"iq-entity-detail\"><header class=\"iq-entity-detail__header\"><h2 class=\"iq-entity-detail__title\">");
+        html.Append(htmlEncoder.Encode(content.Title));
+        html.Append("</h2><p class=\"iq-entity-detail__type\">");
+        html.Append(htmlEncoder.Encode(content.ContentType));
+        html.Append("</p></header>");
+
+        if (!string.IsNullOrWhiteSpace(content.Description))
+        {
+            html.Append("<p class=\"iq-entity-detail__description\">");
+            html.Append(htmlEncoder.Encode(content.Description));
+            html.Append("</p>");
+        }
+
+        if (!string.IsNullOrWhiteSpace(content.Body))
+        {
+            html.Append("<div class=\"iq-entity-detail__body\"><p>");
+            html.Append(htmlEncoder.Encode(content.Body));
+            html.Append("</p></div>");
+        }
+
+        html.Append("<dl class=\"iq-entity-detail__meta\">");
+        AppendMeta(html, "Status", content.Status);
+        AppendMeta(html, "Name", content.Name);
+        if (!string.IsNullOrWhiteSpace(content.AuthorUserId))
+        {
+            AppendMeta(html, "Author", content.AuthorUserId);
+        }
+        if (content.PublishedAt.HasValue)
+        {
+            AppendMeta(html, "Published", content.PublishedAt.Value.ToString("MMM d, yyyy"));
+        }
+        AppendMeta(html, "Created", content.CreatedAt.ToString("MMM d, yyyy"));
+        if (!string.IsNullOrWhiteSpace(content.MetadataJson))
+        {
+            AppendMeta(html, "Metadata", "Present");
+        }
+        html.Append("</dl>");
+
+        html.Append(labelHtmlRenderer.RenderContentLabels(content.ContentLabels));
+
+        var relationships = content.SourceRelationships
+            .Where(r => r.TargetContent is not null)
+            .OrderBy(r => r.RelationshipType)
+            .ThenBy(r => r.TargetContent!.Title)
+            .ToList();
+
+        if (relationships.Count > 0)
+        {
+            html.Append("<ul class=\"iq-entity-detail__relationships\" aria-label=\"Relationships\">");
+            foreach (var relationship in relationships)
+            {
+                html.Append("<li class=\"iq-entity-detail__relationship\"><span>");
+                html.Append(htmlEncoder.Encode(relationship.RelationshipType));
+                html.Append("</span> ");
+                html.Append(htmlEncoder.Encode(relationship.TargetContent!.Title));
+                html.Append("</li>");
+            }
+            html.Append("</ul>");
+        }
+
+        html.Append("</article>");
+        return html.ToString();
+    }
+
+    public string RenderEntityCard(Content.Content entity, ComponentInteractionOptions interactions)
     {
         var html = new StringBuilder();
         html.Append("<article class=\"iq-entity\"><div class=\"iq-entity__main\"><p class=\"iq-entity__type\">");
-        html.Append(htmlEncoder.Encode(entity.EntityType));
+        html.Append(htmlEncoder.Encode(entity.ContentType));
         html.Append("</p><h3 class=\"iq-entity__title\">");
         html.Append(htmlEncoder.Encode(entity.Title));
         html.Append("</h3>");
@@ -151,30 +218,29 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         }
 
         html.Append("</p>");
-        html.Append(labelHtmlRenderer.RenderEntityLabels(entity.EntityLabels));
+        html.Append(labelHtmlRenderer.RenderContentLabels(entity.ContentLabels));
 
         var relationships = entity.SourceRelationships
-            .Where(relationship => relationship.TargetEntity is not null)
-            .OrderBy(relationship => relationship.RelationshipType)
-            .ThenBy(relationship => relationship.TargetEntity!.Title)
+            .Where(r => r.TargetContent is not null)
+            .OrderBy(r => r.RelationshipType)
+            .ThenBy(r => r.TargetContent!.Title)
             .ToList();
 
         if (relationships.Count > 0)
         {
             html.Append("<ul class=\"iq-entity__relationships\" aria-label=\"Relationships\">");
-
             foreach (var relationship in relationships)
             {
                 html.Append("<li class=\"iq-entity__relationship\"><span>");
                 html.Append(htmlEncoder.Encode(relationship.RelationshipType));
                 html.Append("</span> ");
-                html.Append(htmlEncoder.Encode(relationship.TargetEntity!.Title));
+                html.Append(htmlEncoder.Encode(relationship.TargetContent!.Title));
                 html.Append("</li>");
             }
-
             html.Append("</ul>");
         }
 
+        html.Append(RenderItemActions("iq-entity", "entity", entity.Id, entity.Title, entity.Body, interactions));
         html.Append("</div></article>");
         return html.ToString();
     }
@@ -183,7 +249,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         string blockClass,
         string displayTitle,
         IReadOnlyList<Post> posts,
-        IReadOnlyList<ContentItem> contentItems,
+        IReadOnlyList<Content.Content> contentItems,
         string emptyText,
         ComponentInteractionOptions interactions)
     {
@@ -279,6 +345,15 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         output.Attributes.SetAttribute("data-allow-label", interactions.AllowLabel.ToString().ToLowerInvariant());
     }
 
+    private void AppendMeta(StringBuilder html, string label, string value)
+    {
+        html.Append("<dt>");
+        html.Append(htmlEncoder.Encode(label));
+        html.Append("</dt><dd>");
+        html.Append(htmlEncoder.Encode(value));
+        html.Append("</dd>");
+    }
+
     private string RenderItemActions(
         string blockClass,
         string itemType,
@@ -325,7 +400,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
     }
 
     private string RenderFileActions(
-        ContentItem item,
+        Content.Content item,
         ComponentInteractionOptions interactions)
     {
         var html = new StringBuilder();
