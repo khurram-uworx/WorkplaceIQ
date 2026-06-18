@@ -27,6 +27,10 @@ public interface IWorkplaceIqStore
         Guid containerId,
         CancellationToken cancellationToken = default);
 
+    Task<Post?> GetPostByIdAsync(
+        Guid postId,
+        CancellationToken cancellationToken = default);
+
     Task<Post> CreatePostAsync(
         Guid containerId,
         string title,
@@ -37,6 +41,14 @@ public interface IWorkplaceIqStore
         string? authorUserId = null,
         bool isSystemGenerated = false,
         string? metadataJson = null,
+        CancellationToken cancellationToken = default);
+
+    Task<Post> UpdatePostAsync(
+        Post post,
+        CancellationToken cancellationToken = default);
+
+    Task DeletePostAsync(
+        Guid postId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ContentItem>> GetContentByContainerAsync(
@@ -53,6 +65,20 @@ public interface IWorkplaceIqStore
 
     Task<ContentItem> UpdateContentAsync(
         ContentItem item,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteContentAsync(
+        Guid contentItemId,
+        CancellationToken cancellationToken = default);
+
+    Task AddLabelToContentAsync(
+        Guid contentItemId,
+        LabelName label,
+        CancellationToken cancellationToken = default);
+
+    Task AddLabelToPostAsync(
+        Guid postId,
+        LabelName label,
         CancellationToken cancellationToken = default);
 
     Task<MetricDefinition?> GetMetricDefinitionByNameAsync(

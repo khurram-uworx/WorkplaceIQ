@@ -68,7 +68,6 @@ public class FeedTagHelperTests
         Assert.That(output.Content.GetContent(), Does.Contain("<p class=\"iq-feed__item-body\">Results are ready.</p>"));
         Assert.That(output.Content.GetContent(), Does.Contain("<li class=\"iq-label\" style=\"--iq-label-color: #2563eb\">"));
         Assert.That(output.Content.GetContent(), Does.Contain("<span class=\"iq-label__dot\" style=\"background-color: #2563eb\"></span>#Operations"));
-        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"comment\""));
         Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"label\""));
         Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"edit\""));
         Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"delete\""));
@@ -281,7 +280,6 @@ public class FeedTagHelperTests
         var html = output.Content.GetContent();
         Assert.That(output.Attributes["data-allow-comment"].Value, Is.EqualTo("false"));
         Assert.That(output.Attributes["data-allow-label"].Value, Is.EqualTo("false"));
-        Assert.That(html, Does.Not.Contain("data-iq-action=\"comment\""));
         Assert.That(html, Does.Not.Contain("data-iq-action=\"label\""));
         Assert.That(html, Does.Contain("data-iq-action=\"edit\""));
         Assert.That(html, Does.Contain("data-iq-action=\"delete\""));

@@ -77,6 +77,17 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             .ToList();
     }
 
+    public Task<Post?> GetPostByIdAsync(
+        Guid postId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Posts
+            .AsNoTracking()
+            .Include(post => post.PostLabels)
+                .ThenInclude(postLabel => postLabel.Label)
+            .FirstOrDefaultAsync(post => post.Id == postId, cancellationToken);
+    }
+
     public async Task<Post> CreatePostAsync(
         Guid containerId,
         string title,
@@ -140,6 +151,29 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         return post;
     }
 
+    public async Task<Post> UpdatePostAsync(
+        Post post,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.Posts.Update(post);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return post;
+    }
+
+    public async Task DeletePostAsync(
+        Guid postId,
+        CancellationToken cancellationToken = default)
+    {
+        var post = await dbContext.Posts.FirstOrDefaultAsync(candidate => candidate.Id == postId, cancellationToken);
+        if (post is null)
+        {
+            return;
+        }
+
+        dbContext.Posts.Remove(post);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private static string InferPostType(Guid? contentId, string? containerType)
     {
         if (contentId.HasValue)
@@ -160,7 +194,11 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             .AsNoTracking()
             .Include(c => c.ContentLabels)
                 .ThenInclude(cl => cl.Label)
+            .Include(c => c.Posts)
+                .ThenInclude(post => post.PostLabels)
+                    .ThenInclude(postLabel => postLabel.Label)
             .Where(c => c.ContainerId == containerId)
+            .Where(c => c.Status != "archived")
             .ToListAsync(cancellationToken);
 
         return items
@@ -176,6 +214,9 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             .AsNoTracking()
             .Include(c => c.ContentLabels)
                 .ThenInclude(cl => cl.Label)
+            .Include(c => c.Posts)
+                .ThenInclude(post => post.PostLabels)
+                    .ThenInclude(postLabel => postLabel.Label)
             .FirstOrDefaultAsync(c => c.Id == contentItemId, cancellationToken);
     }
 
@@ -186,6 +227,88 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         dbContext.ContentItems.Add(item);
         await dbContext.SaveChangesAsync(cancellationToken);
         return item;
+    }
+
+    public async Task DeleteContentAsync(
+        Guid contentItemId,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.ContentItems.FirstOrDefaultAsync(candidate => candidate.Id == contentItemId, cancellationToken);
+        if (item is null)
+        {
+            return;
+        }
+
+        item.Status = "archived";
+        item.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddLabelToContentAsync(
+        Guid contentItemId,
+        LabelName label,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await GetOrCreateLabelAsync(label, cancellationToken);
+        var exists = await dbContext.ContentLabels.AnyAsync(
+            contentLabel => contentLabel.ContentItemId == contentItemId && contentLabel.LabelId == entity.Id,
+            cancellationToken);
+
+        if (!exists)
+        {
+            dbContext.ContentLabels.Add(new ContentLabel
+            {
+                ContentItemId = contentItemId,
+                LabelId = entity.Id
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task AddLabelToPostAsync(
+        Guid postId,
+        LabelName label,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await GetOrCreateLabelAsync(label, cancellationToken);
+        var exists = await dbContext.PostLabels.AnyAsync(
+            postLabel => postLabel.PostId == postId && postLabel.LabelId == entity.Id,
+            cancellationToken);
+
+        if (!exists)
+        {
+            dbContext.PostLabels.Add(new PostLabel
+            {
+                PostId = postId,
+                LabelId = entity.Id
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private async Task<Label> GetOrCreateLabelAsync(
+        LabelName labelName,
+        CancellationToken cancellationToken)
+    {
+        var label = await dbContext.Labels.FirstOrDefaultAsync(
+            candidate => candidate.NormalizedName == labelName.NormalizedName,
+            cancellationToken);
+
+        if (label is not null)
+        {
+            return label;
+        }
+
+        label = new Label
+        {
+            Name = labelName.Name,
+            NormalizedName = labelName.NormalizedName,
+            Slug = labelName.Slug,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        dbContext.Labels.Add(label);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return label;
     }
 
     public async Task<ContentItem> UpdateContentAsync(

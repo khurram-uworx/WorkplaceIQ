@@ -66,6 +66,13 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
             Posts.Where(post => post.ContainerId == containerId).ToList());
     }
 
+    public Task<Post?> GetPostByIdAsync(
+        Guid postId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Posts.FirstOrDefault(post => post.Id == postId));
+    }
+
     public Task<Post> CreatePostAsync(
         Guid containerId,
         string title,
@@ -121,6 +128,27 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         return Task.FromResult(post);
     }
 
+    public Task<Post> UpdatePostAsync(
+        Post post,
+        CancellationToken cancellationToken = default)
+    {
+        var index = Posts.FindIndex(candidate => candidate.Id == post.Id);
+        if (index >= 0)
+        {
+            Posts[index] = post;
+        }
+
+        return Task.FromResult(post);
+    }
+
+    public Task DeletePostAsync(
+        Guid postId,
+        CancellationToken cancellationToken = default)
+    {
+        Posts.RemoveAll(post => post.Id == postId);
+        return Task.CompletedTask;
+    }
+
     private static string InferPostType(Guid? contentId, string? containerType)
     {
         if (contentId.HasValue)
@@ -154,6 +182,81 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
     {
         ContentItems.Add(item);
         return Task.FromResult(item);
+    }
+
+    public Task DeleteContentAsync(
+        Guid contentItemId,
+        CancellationToken cancellationToken = default)
+    {
+        var item = ContentItems.FirstOrDefault(content => content.Id == contentItemId);
+        if (item is not null)
+        {
+            item.Status = "archived";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task AddLabelToContentAsync(
+        Guid contentItemId,
+        LabelName label,
+        CancellationToken cancellationToken = default)
+    {
+        var content = ContentItems.FirstOrDefault(item => item.Id == contentItemId);
+        if (content is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var entity = GetOrCreateLabel(label);
+        content.ContentLabels.Add(new ContentLabel
+        {
+            ContentItem = content,
+            ContentItemId = content.Id,
+            Label = entity,
+            LabelId = entity.Id
+        });
+        return Task.CompletedTask;
+    }
+
+    public Task AddLabelToPostAsync(
+        Guid postId,
+        LabelName label,
+        CancellationToken cancellationToken = default)
+    {
+        var post = Posts.FirstOrDefault(item => item.Id == postId);
+        if (post is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var entity = GetOrCreateLabel(label);
+        post.PostLabels.Add(new PostLabel
+        {
+            Post = post,
+            PostId = post.Id,
+            Label = entity,
+            LabelId = entity.Id
+        });
+        return Task.CompletedTask;
+    }
+
+    private Label GetOrCreateLabel(LabelName labelName)
+    {
+        var label = Labels.FirstOrDefault(candidate => candidate.NormalizedName == labelName.NormalizedName);
+        if (label is not null)
+        {
+            return label;
+        }
+
+        label = new Label
+        {
+            Name = labelName.Name,
+            NormalizedName = labelName.NormalizedName,
+            Slug = labelName.Slug
+        };
+        Labels.Add(label);
+        return label;
     }
 
     public Task<ContentItem> UpdateContentAsync(
