@@ -4,6 +4,11 @@
 
 <h1 class="mb-4">WorkplaceIQ Demo</h1>
 
+@if (TempData["ItemActionMessage"] is string itemActionMessage)
+{
+    <div class="alert alert-success" role="status">@itemActionMessage</div>
+}
+
 <div class="iq-metrics-row mb-4">
     <iq-metric name="workplaceiq.container.content.count"
                source="PowerOutages"
@@ -20,9 +25,13 @@
 
 <div class="iq-demo-grid">
     <div>
-        <iq-feed id="PowerOutages" title="Power Outages in Factory"></iq-feed>
+        <iq-feed id="PowerOutages"
+                 title="Power Outages in Factory"
+                 system-managed="true"></iq-feed>
 
-        <iq-feed id="CompanyNews" title="News Feed"></iq-feed>
+        <iq-feed id="CompanyNews"
+                 title="News Feed"
+                 disable-comment="true"></iq-feed>
 
         <form asp-action="CreateFeedPost" method="post" class="mt-4">
             <input type="hidden" name="feedId" value="CompanyNews" />

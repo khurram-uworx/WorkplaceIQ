@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Encodings.Web;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
 
 namespace WorkplaceIQ.AspNet.Rendering;
@@ -8,13 +9,25 @@ public sealed class LabelHtmlRenderer(HtmlEncoder htmlEncoder)
 {
     public string Render(IEnumerable<PostLabel> postLabels)
     {
-        var labels = postLabels
+        return RenderLabels(postLabels
             .Select(postLabel => postLabel.Label)
-            .Where(label => label is not null)
-            .OrderBy(label => label!.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(label => label is not null)!);
+    }
+
+    public string RenderContentLabels(IEnumerable<ContentLabel> contentLabels)
+    {
+        return RenderLabels(contentLabels
+            .Select(contentLabel => contentLabel.Label)
+            .Where(label => label is not null)!);
+    }
+
+    private string RenderLabels(IEnumerable<Label> labels)
+    {
+        var orderedLabels = labels
+            .OrderBy(label => label.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (labels.Count == 0)
+        if (orderedLabels.Count == 0)
         {
             return string.Empty;
         }
@@ -22,10 +35,10 @@ public sealed class LabelHtmlRenderer(HtmlEncoder htmlEncoder)
         var html = new StringBuilder();
         html.Append("<ul class=\"iq-labels\" aria-label=\"Labels\">");
 
-        foreach (var label in labels)
+        foreach (var label in orderedLabels)
         {
             html.Append("<li class=\"iq-label\"");
-            if (!string.IsNullOrWhiteSpace(label!.Color))
+            if (!string.IsNullOrWhiteSpace(label.Color))
             {
                 html.Append(" style=\"--iq-label-color: ");
                 html.Append(htmlEncoder.Encode(label.Color));
