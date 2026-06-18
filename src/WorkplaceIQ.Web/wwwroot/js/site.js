@@ -22,6 +22,7 @@ document.addEventListener("click", event => {
   document.getElementById("iqItemActionModalLabel").textContent = config.title;
   document.getElementById("iqItemActionSubmit").textContent = config.submit;
   document.getElementById("iqItemActionSubmit").className = config.submitClass;
+  document.querySelector("label[for=\"iqItemActionBody\"]").textContent = config.bodyLabel || "Comment";
   document.getElementById("iqItemActionType").value = trigger.dataset.iqItemType || "";
   document.getElementById("iqItemActionId").value = trigger.dataset.iqItemId || "";
   document.getElementById("iqItemActionMessage").textContent = config.message || "";
@@ -81,6 +82,7 @@ function getItemActionConfig(action) {
         submitClass: "btn btn-primary",
         action: "/Content/Edit",
         fields: ["title", "body"],
+        bodyLabel: "Body",
         prefillBody: true,
         requiredBody: false
       };

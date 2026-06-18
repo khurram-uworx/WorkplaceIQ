@@ -4,6 +4,7 @@ using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Web.Controllers;
 
+[AutoValidateAntiforgeryToken]
 public sealed class ContentController(IWorkplaceIqStore store) : Controller
 {
     [HttpPost]
@@ -31,7 +32,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
             contentId: item.Id,
             postType: PostTypes.Comment);
 
-        TempData["FeedPostCreated"] = "Comment added.";
+        TempData["ItemActionMessage"] = "Comment added.";
         return RedirectToAction("Index", "Home");
     }
 
@@ -56,7 +57,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
             await store.AddLabelToPostAsync(itemId, parsed);
         }
 
-        TempData["FeedPostCreated"] = "Label added.";
+        TempData["ItemActionMessage"] = "Label added.";
         return RedirectToAction("Index", "Home");
     }
 
@@ -94,7 +95,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
             }
         }
 
-        TempData["FeedPostCreated"] = "Item updated.";
+        TempData["ItemActionMessage"] = "Item updated.";
         return RedirectToAction("Index", "Home");
     }
 
@@ -112,7 +113,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
             await store.DeletePostAsync(itemId);
         }
 
-        TempData["FeedPostCreated"] = "Item deleted.";
+        TempData["ItemActionMessage"] = "Item deleted.";
         return RedirectToAction("Index", "Home");
     }
 }

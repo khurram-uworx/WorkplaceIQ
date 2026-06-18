@@ -4,6 +4,11 @@
 
 <h1 class="mb-4">WorkplaceIQ Demo</h1>
 
+@if (TempData["ItemActionMessage"] is string itemActionMessage)
+{
+    <div class="alert alert-success" role="status">@itemActionMessage</div>
+}
+
 <div class="iq-metrics-row mb-4">
     <iq-metric name="workplaceiq.container.content.count"
                source="PowerOutages"

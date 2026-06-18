@@ -46,6 +46,7 @@
     <div class="modal fade" id="iqItemActionModal" tabindex="-1" aria-labelledby="iqItemActionModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <form method="post" class="modal-content" id="iqItemActionForm">
+                @Html.AntiForgeryToken()
                 <div class="modal-header">
                     <h2 class="modal-title fs-5" id="iqItemActionModalLabel">Item action</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
