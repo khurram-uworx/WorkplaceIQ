@@ -19,20 +19,20 @@ public sealed class FeedTagHelper(
     [HtmlAttributeName("system-managed")]
     public bool SystemManaged { get; set; }
 
-    [HtmlAttributeName("allow-add")]
-    public bool? AllowAdd { get; set; }
+    [HtmlAttributeName("disable-add")]
+    public bool DisableAdd { get; set; }
 
-    [HtmlAttributeName("allow-edit")]
-    public bool? AllowEdit { get; set; }
+    [HtmlAttributeName("disable-edit")]
+    public bool DisableEdit { get; set; }
 
-    [HtmlAttributeName("allow-delete")]
-    public bool? AllowDelete { get; set; }
+    [HtmlAttributeName("disable-delete")]
+    public bool DisableDelete { get; set; }
 
-    [HtmlAttributeName("allow-comment")]
-    public bool? AllowComment { get; set; }
+    [HtmlAttributeName("disable-comment")]
+    public bool DisableComment { get; set; }
 
-    [HtmlAttributeName("allow-label")]
-    public bool? AllowLabel { get; set; }
+    [HtmlAttributeName("disable-label")]
+    public bool DisableLabel { get; set; }
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
@@ -62,11 +62,11 @@ public sealed class FeedTagHelper(
 
         return defaults with
         {
-            AllowAdd = AllowAdd ?? defaults.AllowAdd,
-            AllowEdit = AllowEdit ?? defaults.AllowEdit,
-            AllowDelete = AllowDelete ?? defaults.AllowDelete,
-            AllowComment = AllowComment ?? defaults.AllowComment,
-            AllowLabel = AllowLabel ?? defaults.AllowLabel
+            AllowAdd = defaults.AllowAdd && !DisableAdd,
+            AllowEdit = defaults.AllowEdit && !DisableEdit,
+            AllowDelete = defaults.AllowDelete && !DisableDelete,
+            AllowComment = defaults.AllowComment && !DisableComment,
+            AllowLabel = defaults.AllowLabel && !DisableLabel
         };
     }
 }

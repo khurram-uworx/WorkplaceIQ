@@ -243,6 +243,50 @@ public class FeedTagHelperTests
         Assert.That(html, Does.Not.Contain("data-iq-action=\"delete\""));
     }
 
+    [Test]
+    public async Task ProcessAsync_DisableAttributesRemoveSpecificInteractions()
+    {
+        var service = new RecordingFeedComponentService(new FeedComponentResult(
+            new Container
+            {
+                Id = Guid.NewGuid(),
+                Key = "CompanyNews",
+                Type = ContainerTypes.Feed,
+                Title = "News Feed"
+            },
+            [
+                new Post
+                {
+                    Title = "Quarterly update",
+                    Body = "Results are ready."
+                }
+            ],
+            [],
+            false,
+            false,
+            "News Feed"));
+
+        var tagHelper = new FeedTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
+        {
+            Id = "CompanyNews",
+            Title = "News Feed",
+            DisableComment = true,
+            DisableLabel = true
+        };
+
+        var output = TagHelperOutputFactory.Create();
+
+        await tagHelper.ProcessAsync(CreateContext(), output);
+
+        var html = output.Content.GetContent();
+        Assert.That(output.Attributes["data-allow-comment"].Value, Is.EqualTo("false"));
+        Assert.That(output.Attributes["data-allow-label"].Value, Is.EqualTo("false"));
+        Assert.That(html, Does.Not.Contain("data-iq-action=\"comment\""));
+        Assert.That(html, Does.Not.Contain("data-iq-action=\"label\""));
+        Assert.That(html, Does.Contain("data-iq-action=\"edit\""));
+        Assert.That(html, Does.Contain("data-iq-action=\"delete\""));
+    }
+
     private static TagHelperContext CreateContext()
     {
         return new TagHelperContext(
