@@ -3,11 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkplaceIQ.AspNet.Data;
+using WorkplaceIQ.AspNet.Files;
 using WorkplaceIQ.AspNet.Rendering;
 using WorkplaceIQ.AspNet.TagHelpers;
 using WorkplaceIQ.Components;
 using WorkplaceIQ.Content;
+using WorkplaceIQ.Entities;
 using WorkplaceIQ.Feeds;
+using WorkplaceIQ.Files;
 using WorkplaceIQ.Forums;
 using WorkplaceIQ.Metrics;
 
@@ -24,6 +27,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IComponentService, ComponentService>();
         services.AddScoped<IFeedComponentService, FeedComponentService>();
         services.AddScoped<IForumComponentService, ForumComponentService>();
+        services.AddScoped<IFileComponentService, FileComponentService>();
+        services.AddScoped<IEntityComponentService, EntityComponentService>();
+        services.AddScoped<IFileObjectStorage, S3FileObjectStorage>();
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IMetricService, MetricService>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider, ContentCountMetricProvider>());

@@ -93,4 +93,47 @@
             <button type="submit" class="btn btn-primary">Add thread</button>
         </form>
     </div>
+
+    <div>
+        <iq-files id="HRDocs" title="HR Documents"></iq-files>
+
+        <form asp-controller="Files" asp-action="Upload" method="post" enctype="multipart/form-data" class="mt-4">
+            <input type="hidden" name="filesId" value="HRDocs" />
+
+            @if (TempData["FilesMessage"] is string filesMessage)
+            {
+                <div class="alert alert-success" role="status">@filesMessage</div>
+            }
+
+            <div class="mb-3">
+                <label for="hr-file" class="form-label">File</label>
+                <input id="hr-file" name="file" type="file" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label for="hr-file-title" class="form-label">Title</label>
+                <input id="hr-file-title" name="title" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="hr-file-description" class="form-label">Description</label>
+                <textarea id="hr-file-description" name="description" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="hr-file-labels" class="form-label">Labels</label>
+                <input id="hr-file-labels" name="labels" class="form-control" placeholder="HR, Policy" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Upload file</button>
+        </form>
+    </div>
+
+    <div>
+        <iq-files id="ITDocs" title="IT Documents"></iq-files>
+    </div>
+
+    <div>
+        <iq-entity-list id="Machines" title="Machines" type="Machine"></iq-entity-list>
+    </div>
 </div>

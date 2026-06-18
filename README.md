@@ -17,6 +17,31 @@ Every feed, forum, document library, business entity, and operational record is 
 
 ---
 
+## Local Docker
+
+Run the demo app with MinIO-backed local infrastructure:
+
+```powershell
+docker compose up --build
+```
+
+The web app is available at `http://localhost:4792`.
+
+MinIO is available at:
+
+* API: `http://localhost:9000`
+* Console: `http://localhost:9001`
+
+Default local credentials:
+
+```text
+workplaceiq / workplaceiq-secret
+```
+
+The Compose file does not create storage buckets yet. Bucket creation should be handled by the application storage provider when the files slice is implemented.
+
+---
+
 ## Vision
 
 Traditional CMS platforms help organizations publish information.

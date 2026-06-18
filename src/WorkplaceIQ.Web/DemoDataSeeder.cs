@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WorkplaceIQ.AspNet.Data;
 using WorkplaceIQ.Content;
+using WorkplaceIQ.Entities;
 using WorkplaceIQ.Feeds;
 using WorkplaceIQ.Forums;
 using WorkplaceIQ.Labels;
@@ -15,6 +16,7 @@ internal static class DemoDataSeeder
         var dbContext = services.GetRequiredService<WorkplaceIqDbContext>();
         var feedService = services.GetRequiredService<IFeedComponentService>();
         var forumService = services.GetRequiredService<IForumComponentService>();
+        var entityService = services.GetRequiredService<IEntityComponentService>();
         var contentService = services.GetRequiredService<IContentService>();
         var store = services.GetRequiredService<IWorkplaceIqStore>();
 
@@ -25,6 +27,11 @@ internal static class DemoDataSeeder
         var forum = await forumService.ResolveForumAsync(new ForumComponentRequest(
             "MaintenanceForum",
             "Maintenance Forum",
+            true));
+        var machines = await entityService.ResolveEntitiesAsync(new EntityComponentRequest(
+            "Machines",
+            "Machines",
+            "Machine",
             true));
 
         // --- Seed Labels with Colors ---
@@ -42,6 +49,8 @@ internal static class DemoDataSeeder
             ("Factory-A", "#16a34a"),
             ("Night-Shift", "#9333ea"),
             ("Severe", "#dc2626"),
+            ("Equipment", "#0f766e"),
+            ("Critical", "#be123c"),
         };
 
         foreach (var (name, color) in labelSets)
@@ -101,6 +110,33 @@ internal static class DemoDataSeeder
                     "MaintenanceForum", "Parking garage lighting",
                     "Report any remaining dark zones after the level two fixture replacement.",
                     "Safety, Maintenance");
+            }
+        }
+
+        // --- Seed Machine Entities ---
+        if (machines.Container is not null)
+        {
+            var existingMachines = await store.GetEntitiesByContainerAsync(machines.Container.Id);
+            if (existingMachines.Count == 0)
+            {
+                var line = await entityService.CreateEntityAsync(new EntityCreateRequest(
+                    "Machines",
+                    "Machine",
+                    "line-1",
+                    "Line 1",
+                    "Primary production line in Factory A.",
+                    MetadataJson: "{\"location\":\"Factory A\",\"owner\":\"Operations\"}",
+                    Labels: "Equipment"));
+                var press = await entityService.CreateEntityAsync(new EntityCreateRequest(
+                    "Machines",
+                    "Machine",
+                    "press-12",
+                    "Press 12",
+                    "Hydraulic press monitored for outage correlation.",
+                    MetadataJson: "{\"location\":\"Factory A\",\"assetTag\":\"P-12\"}",
+                    Labels: "Equipment, Critical"));
+
+                await entityService.CreateRelationshipAsync(press.Id, line.Id, "part of");
             }
         }
 

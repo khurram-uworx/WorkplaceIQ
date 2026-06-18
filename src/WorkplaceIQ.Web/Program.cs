@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
 using WorkplaceIQ.AspNet;
+using WorkplaceIQ.AspNet.Files;
 using WorkplaceIQ.AspNet.Data;
 using WorkplaceIQ.Web;
 
@@ -12,6 +13,8 @@ builder.Logging.AddConsole();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.Configure<FileStorageOptions>(
+    builder.Configuration.GetSection("WorkplaceIQ:Storage"));
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(
         Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys")));
