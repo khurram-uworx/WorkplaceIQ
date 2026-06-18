@@ -2,16 +2,16 @@ namespace WorkplaceIQ.Content;
 
 public interface IContentService
 {
-    Task<IReadOnlyList<ContentItem>> GetByContainerAsync(
-        Guid containerId,
+    Task<IReadOnlyList<Content>> GetByParentAsync(
+        Guid parentId,
         CancellationToken cancellationToken = default);
 
-    Task<ContentItem?> GetByIdAsync(
-        Guid contentItemId,
+    Task<Content?> GetByIdAsync(
+        Guid contentId,
         CancellationToken cancellationToken = default);
 
-    Task<ContentItem> CreateAsync(
-        Guid containerId,
+    Task<Content> CreateAsync(
+        Guid parentId,
         string contentType,
         string name,
         string title,
@@ -20,8 +20,8 @@ public interface IContentService
         string? metadataJson = null,
         CancellationToken cancellationToken = default);
 
-    Task<ContentItem> UpdateAsync(
-        Guid contentItemId,
+    Task<Content> UpdateAsync(
+        Guid contentId,
         string? title = null,
         string? body = null,
         string? status = null,

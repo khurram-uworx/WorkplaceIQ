@@ -1,5 +1,5 @@
 using WorkplaceIQ.Components;
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Forums;
@@ -14,7 +14,7 @@ public sealed class ForumComponentService(IComponentService componentService) : 
             new ComponentRequest(
                 request.Id,
                 request.Title,
-                ContainerTypes.Forum,
+                ContentTypes.ForumContainer,
                 request.AutoProvision,
                 "forum"),
             cancellationToken);
@@ -36,7 +36,7 @@ public sealed class ForumComponentService(IComponentService componentService) : 
     {
         return componentService.CreatePostAsync(
             forumId,
-            ContainerTypes.Forum,
+            ContentTypes.ForumContainer,
             "forum",
             title,
             body,

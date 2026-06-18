@@ -1,10 +1,9 @@
-namespace WorkplaceIQ.Tests.Services;
-
 using Microsoft.Extensions.Logging.Abstractions;
-using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.Services;
 
 public class MetricServiceTests
 {
@@ -12,7 +11,12 @@ public class MetricServiceTests
     public async Task ComputeAsync_ReturnsContentCountForSourceContainer()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var container = await store.CreateContainerAsync("FactoryPowerOutages", ContainerTypes.Feed, "Factory Power Outages");
+        var container = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "FactoryPowerOutages",
+            ContentType = ContentTypes.FeedContainer,
+            Title = "Factory Power Outages"
+        });
         AddContentItem(store, container.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         AddContentItem(store, container.Id, "Policy", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
@@ -20,13 +24,13 @@ public class MetricServiceTests
         var result = await service.ComputeAsync(new MetricRequest(
             MetricNames.ContainerContentCount,
             ContainerId: container.Id,
-            ContainerType: ContainerTypes.Feed,
+            ContainerType: ContentTypes.FeedContainer,
             ContentType: "Outage",
             Window: "last_7_days"));
 
         Assert.That(result.Value, Is.EqualTo(1));
         Assert.That(result.Unit, Is.EqualTo("count"));
-        Assert.That(result.Tags["container.key"], Is.EqualTo("FactoryPowerOutages"));
+        Assert.That(result.Tags["container.name"], Is.EqualTo("FactoryPowerOutages"));
         Assert.That(result.Tags["content.type"], Is.EqualTo("Outage"));
         Assert.That(result.Tags["window"], Is.EqualTo("last_7_days"));
     }
@@ -35,7 +39,12 @@ public class MetricServiceTests
     public async Task ComputeAsync_ReturnsMetadataSumWithDisplayUnit()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var container = await store.CreateContainerAsync("FactoryPowerOutages", ContainerTypes.Feed, "Factory Power Outages");
+        var container = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "FactoryPowerOutages",
+            ContentType = ContentTypes.FeedContainer,
+            Title = "Factory Power Outages"
+        });
         AddContentItem(store, container.Id, "Outage", durationSeconds: 3600, createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         AddContentItem(store, container.Id, "Outage", durationSeconds: 7200, createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
@@ -43,7 +52,7 @@ public class MetricServiceTests
         var result = await service.ComputeAsync(new MetricRequest(
             MetricNames.MetadataSum,
             ContainerId: container.Id,
-            ContainerType: ContainerTypes.Feed,
+            ContainerType: ContentTypes.FeedContainer,
             ContentType: "Outage",
             SourceField: "durationSeconds",
             Window: "last_7_days",
@@ -60,9 +69,24 @@ public class MetricServiceTests
     public async Task ComputeSeriesAsync_ExpandsGenericMetricAcrossMatchingContainers()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var factory = await store.CreateContainerAsync("FactoryPowerOutages", ContainerTypes.Feed, "Factory Power Outages");
-        var office = await store.CreateContainerAsync("OfficePowerOutages", ContainerTypes.Feed, "Office Power Outages");
-        var forum = await store.CreateContainerAsync("MaintenanceForum", ContainerTypes.Forum, "Maintenance Forum");
+        var factory = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "FactoryPowerOutages",
+            ContentType = ContentTypes.FeedContainer,
+            Title = "Factory Power Outages"
+        });
+        var office = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "OfficePowerOutages",
+            ContentType = ContentTypes.FeedContainer,
+            Title = "Office Power Outages"
+        });
+        var forum = await store.CreateContentAsync(new Content.Content
+        {
+            Name = "MaintenanceForum",
+            ContentType = ContentTypes.ForumContainer,
+            Title = "Maintenance Forum"
+        });
         AddContentItem(store, factory.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         AddContentItem(store, factory.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-2));
         AddContentItem(store, office.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
@@ -71,13 +95,13 @@ public class MetricServiceTests
 
         var series = await service.ComputeSeriesAsync(new MetricRequest(
             MetricNames.ContainerContentCount,
-            ContainerType: ContainerTypes.Feed,
+            ContainerType: ContentTypes.FeedContainer,
             ContentType: "Outage",
             Window: "last_7_days"));
 
         Assert.That(series, Has.Count.EqualTo(2));
-        Assert.That(series.Single(result => (string)result.Tags["container.key"]! == "FactoryPowerOutages").Value, Is.EqualTo(2));
-        Assert.That(series.Single(result => (string)result.Tags["container.key"]! == "OfficePowerOutages").Value, Is.EqualTo(1));
+        Assert.That(series.Single(result => (string)result.Tags["container.name"]! == "FactoryPowerOutages").Value, Is.EqualTo(2));
+        Assert.That(series.Single(result => (string)result.Tags["container.name"]! == "OfficePowerOutages").Value, Is.EqualTo(1));
     }
 
     [Test]
@@ -98,9 +122,9 @@ public class MetricServiceTests
         double durationSeconds = 0,
         DateTimeOffset? createdAt = null)
     {
-        store.ContentItems.Add(new ContentItem
+        store.Contents.Add(new Content.Content
         {
-            ContainerId = containerId,
+            ParentId = containerId,
             ContentType = contentType,
             Name = Guid.NewGuid().ToString("N"),
             Title = contentType,

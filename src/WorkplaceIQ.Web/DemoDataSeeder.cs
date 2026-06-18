@@ -17,7 +17,6 @@ internal static class DemoDataSeeder
         var feedService = services.GetRequiredService<IFeedComponentService>();
         var forumService = services.GetRequiredService<IForumComponentService>();
         var entityService = services.GetRequiredService<IEntityComponentService>();
-        var contentService = services.GetRequiredService<IContentService>();
         var store = services.GetRequiredService<IWorkplaceIqStore>();
 
         var feed = await feedService.ResolveFeedAsync(new FeedComponentRequest(
@@ -116,7 +115,7 @@ internal static class DemoDataSeeder
         // --- Seed Machine Entities ---
         if (machines.Container is not null)
         {
-            var existingMachines = await store.GetEntitiesByContainerAsync(machines.Container.Id);
+            var existingMachines = await store.GetChildrenAsync(machines.Container.Id);
             if (existingMachines.Count == 0)
             {
                 var line = await entityService.CreateEntityAsync(new EntityCreateRequest(
@@ -141,10 +140,15 @@ internal static class DemoDataSeeder
         }
 
         // --- Seed Power Outages Container + Content ---
-        var outagesContainer = await store.GetContainerByKeyAsync("PowerOutages", "feed");
+        var outagesContainer = await store.GetContentByNameAsync("PowerOutages");
         if (outagesContainer is null)
         {
-            outagesContainer = await store.CreateContainerAsync("PowerOutages", "feed", "Power Outages in Factory");
+            outagesContainer = await store.CreateContentAsync(new Content.Content
+            {
+                Name = "PowerOutages",
+                ContentType = ContentTypes.FeedContainer,
+                Title = "Power Outages in Factory"
+            });
         }
 
         var outages = new[]
@@ -163,7 +167,7 @@ internal static class DemoDataSeeder
             (title: "Routine breaker test", severity: "Low", duration: 900, machine: "Breaker-2", location: "Factory A", shift: "Day", ago: 25),
         };
 
-        var existingOutageContent = await store.GetContentByContainerAsync(outagesContainer.Id);
+        var existingOutageContent = await store.GetChildrenAsync(outagesContainer.Id);
         foreach (var (title, severity, duration, machine, location, shift, ago) in outages)
         {
             var createdAt = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(-ago), TimeSpan.Zero);
@@ -173,6 +177,7 @@ internal static class DemoDataSeeder
 
             if (existing is null)
             {
+                var contentService = services.GetRequiredService<IContentService>();
                 existing = await contentService.CreateAsync(
                     outagesContainer.Id,
                     "Outage",
@@ -198,7 +203,7 @@ internal static class DemoDataSeeder
                 new MetricDefinition
                 {
                     Name = MetricNames.ContainerContentCount,
-                    ContainerType = "feed",
+                    ContainerType = "FeedContainer",
                     InstrumentKind = "Gauge",
                     Aggregation = "Count",
                     Unit = "count",
@@ -207,7 +212,7 @@ internal static class DemoDataSeeder
                 new MetricDefinition
                 {
                     Name = MetricNames.MetadataSum,
-                    ContainerType = "feed",
+                    ContainerType = "FeedContainer",
                     InstrumentKind = "Gauge",
                     Aggregation = "Sum",
                     Unit = "seconds",

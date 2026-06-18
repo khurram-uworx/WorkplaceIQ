@@ -157,7 +157,8 @@ Example:
 <iq-files id="SafetyDocuments"
           title="Safety Documents" />
 
-<iq-entity type="Machine" />
+<iq-entity id="Machines"
+          type="Machine" />
 ```
 
 Behind the scenes the platform provisions:
@@ -204,9 +205,9 @@ Document management.
 Business objects.
 
 ```html
-<iq-entity type="Customer" />
-<iq-entity type="Machine" />
-<iq-entity type="Project" />
+<iq-entity id="Customers" type="Customer" />
+<iq-entity id="Machines" type="Machine" />
+<iq-entity id="Projects" type="Project" />
 ```
 
 ### Dashboards

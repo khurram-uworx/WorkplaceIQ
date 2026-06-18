@@ -11,10 +11,10 @@ public interface IFileComponentService
         CancellationToken cancellationToken = default);
 
     Task<FileObject?> GetFileAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default);
 
     Task<Stream> OpenReadAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default);
 }

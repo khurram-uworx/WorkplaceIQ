@@ -44,7 +44,7 @@ public sealed class MetadataAggregationMetricProvider(
             .ToList();
     }
 
-    private static double? ExtractFieldValue(ContentItem item, string fieldName)
+    private static double? ExtractFieldValue(Content.Content item, string fieldName)
     {
         if (string.IsNullOrWhiteSpace(item.MetadataJson))
         {

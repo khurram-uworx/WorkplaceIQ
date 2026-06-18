@@ -1,6 +1,4 @@
-using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
-using WorkplaceIQ.Entities;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Metrics;
@@ -10,19 +8,33 @@ namespace WorkplaceIQ;
 
 public interface IWorkplaceIqStore
 {
-    Task<Container?> GetContainerByKeyAsync(
-        string key,
-        string type,
+    Task<Content.Content?> GetContentByNameAsync(
+        string name,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Container>> GetContainersAsync(
-        string? type = null,
+    Task<Content.Content?> GetContentByIdAsync(
+        Guid contentId,
         CancellationToken cancellationToken = default);
 
-    Task<Container> CreateContainerAsync(
-        string key,
-        string type,
-        string title,
+    Task<IReadOnlyList<Content.Content>> GetChildrenAsync(
+        Guid parentId,
+        string? contentType = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Content.Content>> GetContentByTypeAsync(
+        string contentType,
+        CancellationToken cancellationToken = default);
+
+    Task<Content.Content> CreateContentAsync(
+        Content.Content content,
+        CancellationToken cancellationToken = default);
+
+    Task<Content.Content> UpdateContentAsync(
+        Content.Content content,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteContentAsync(
+        Guid contentId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Post>> GetPostsAsync(
@@ -53,62 +65,24 @@ public interface IWorkplaceIqStore
         Guid postId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<ContentItem>> GetContentByContainerAsync(
-        Guid containerId,
-        CancellationToken cancellationToken = default);
-
-    Task<ContentItem?> GetContentByIdAsync(
-        Guid contentItemId,
-        CancellationToken cancellationToken = default);
-
-    Task<ContentItem> CreateContentAsync(
-        ContentItem item,
-        CancellationToken cancellationToken = default);
-
-    Task<ContentItem> UpdateContentAsync(
-        ContentItem item,
-        CancellationToken cancellationToken = default);
-
-    Task DeleteContentAsync(
-        Guid contentItemId,
-        CancellationToken cancellationToken = default);
-
     Task<IReadOnlyList<FileObject>> GetFilesByContainerAsync(
         Guid containerId,
         CancellationToken cancellationToken = default);
 
     Task<FileObject?> GetFileByContentIdAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default);
 
     Task<FileObject> CreateFileRecordAsync(
         FileRecord fileRecord,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<BusinessEntity>> GetEntitiesByContainerAsync(
-        Guid containerId,
-        CancellationToken cancellationToken = default);
-
-    Task<BusinessEntity?> GetEntityByIdAsync(
-        Guid entityId,
-        CancellationToken cancellationToken = default);
-
-    Task<BusinessEntity> CreateEntityAsync(
-        BusinessEntity entity,
-        IReadOnlyList<LabelName> labels,
-        CancellationToken cancellationToken = default);
-
-    Task<EntityRelationship> CreateEntityRelationshipAsync(
-        EntityRelationship relationship,
+    Task<ContentRelationship> CreateContentRelationshipAsync(
+        ContentRelationship relationship,
         CancellationToken cancellationToken = default);
 
     Task AddLabelToContentAsync(
-        Guid contentItemId,
-        LabelName label,
-        CancellationToken cancellationToken = default);
-
-    Task AddLabelToEntityAsync(
-        Guid entityId,
+        Guid contentId,
         LabelName label,
         CancellationToken cancellationToken = default);
 

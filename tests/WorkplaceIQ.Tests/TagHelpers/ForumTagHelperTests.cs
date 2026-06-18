@@ -1,14 +1,14 @@
-namespace WorkplaceIQ.Tests.TagHelpers;
-
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Text.Encodings.Web;
 using WorkplaceIQ.AspNet.Rendering;
 using WorkplaceIQ.AspNet.TagHelpers;
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Forums;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Posts;
 using WorkplaceIQ.Tests.TestDoubles;
+
+namespace WorkplaceIQ.Tests.TagHelpers;
 
 public class ForumTagHelperTests
 {
@@ -16,11 +16,11 @@ public class ForumTagHelperTests
     public async Task ProcessAsync_ResolvesForumByIdAndRendersTitleThreadsAndLabels()
     {
         var service = new RecordingForumComponentService(new ForumComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "MaintenanceForum",
-                Type = ContainerTypes.Forum,
+                Name = "MaintenanceForum",
+                ContentType = ContentTypes.ForumContainer,
                 Title = "Maintenance Forum"
             },
             [
@@ -73,11 +73,11 @@ public class ForumTagHelperTests
     public async Task ProcessAsync_RendersEmptyStateWhenForumHasNoPosts()
     {
         var service = new RecordingForumComponentService(new ForumComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "MaintenanceForum",
-                Type = ContainerTypes.Forum,
+                Name = "MaintenanceForum",
+                ContentType = ContentTypes.ForumContainer,
                 Title = "Maintenance Forum"
             },
             [],
@@ -102,11 +102,11 @@ public class ForumTagHelperTests
     public async Task ProcessAsync_EncodesTitleThreadContentAndLabels()
     {
         var service = new RecordingForumComponentService(new ForumComponentResult(
-            new Container
+            new Content.Content
             {
                 Id = Guid.NewGuid(),
-                Key = "MaintenanceForum",
-                Type = ContainerTypes.Forum,
+                Name = "MaintenanceForum",
+                ContentType = ContentTypes.ForumContainer,
                 Title = "<Forum>"
             },
             [

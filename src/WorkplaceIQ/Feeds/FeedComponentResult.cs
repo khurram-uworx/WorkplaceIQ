@@ -1,13 +1,12 @@
-using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Feeds;
 
 public sealed record FeedComponentResult(
-    Container? Container,
+    Content.Content? Container,
     IReadOnlyList<Post> Posts,
-    IReadOnlyList<ContentItem> ContentItems,
+    IReadOnlyList<Content.Content> ContentItems,
     bool Created,
     bool Missing,
     string DisplayTitle);

@@ -57,7 +57,7 @@ public sealed class MetricTagHelper(
             var containerId = ContainerId;
             if (containerId is null && !string.IsNullOrWhiteSpace(Source))
             {
-                var container = await store.GetContainerByKeyAsync(Source.Trim(), ContainerType);
+                var container = await store.GetContentByNameAsync(Source.Trim());
                 containerId = container?.Id;
             }
 
