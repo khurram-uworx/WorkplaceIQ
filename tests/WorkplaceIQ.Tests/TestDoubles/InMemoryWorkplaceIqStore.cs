@@ -1,69 +1,99 @@
-namespace WorkplaceIQ.Tests.TestDoubles;
-
-using WorkplaceIQ;
-using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
-using WorkplaceIQ.Entities;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Posts;
 
+namespace WorkplaceIQ.Tests.TestDoubles;
+
 internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
 {
-    public List<Container> Containers { get; } = [];
+    public List<Content.Content> Contents { get; } = [];
 
     public List<Post> Posts { get; } = [];
 
     public List<Label> Labels { get; } = [];
 
-    public List<ContentItem> ContentItems { get; } = [];
-
     public List<FileRecord> FileRecords { get; } = [];
 
-    public List<BusinessEntity> Entities { get; } = [];
-
-    public List<EntityRelationship> EntityRelationships { get; } = [];
+    public List<ContentRelationship> ContentRelationships { get; } = [];
 
     public List<MetricDefinition> MetricDefinitions { get; } = [];
 
-    public Task<Container?> GetContainerByKeyAsync(
-        string key,
-        string type,
+    public Task<Content.Content?> GetContentByNameAsync(
+        string name,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(Containers.FirstOrDefault(container =>
-            container.Key == key && container.Type == type));
+        return Task.FromResult(Contents.FirstOrDefault(c => c.Name == name));
     }
 
-    public Task<IReadOnlyList<Container>> GetContainersAsync(
-        string? type = null,
+    public Task<Content.Content?> GetContentByIdAsync(
+        Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<IReadOnlyList<Container>>(
-            Containers
-                .Where(container => string.IsNullOrWhiteSpace(type) || container.Type == type)
-                .OrderBy(container => container.Title)
+        return Task.FromResult(Contents.FirstOrDefault(c => c.Id == contentId));
+    }
+
+    public Task<IReadOnlyList<Content.Content>> GetChildrenAsync(
+        Guid parentId,
+        string? contentType = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = Contents
+            .Where(c => c.ParentId == parentId)
+            .Where(c => c.Status != "archived");
+
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            query = query.Where(c => c.ContentType == contentType);
+        }
+
+        return Task.FromResult<IReadOnlyList<Content.Content>>(
+            query.OrderBy(c => c.Title).ToList());
+    }
+
+    public Task<IReadOnlyList<Content.Content>> GetContentByTypeAsync(
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<Content.Content>>(
+            Contents
+                .Where(c => c.ContentType == contentType)
+                .Where(c => c.Status != "archived")
+                .OrderBy(c => c.Title)
                 .ToList());
     }
 
-    public Task<Container> CreateContainerAsync(
-        string key,
-        string type,
-        string title,
+    public Task<Content.Content> CreateContentAsync(
+        Content.Content content,
         CancellationToken cancellationToken = default)
     {
-        var container = new Container
+        Contents.Add(content);
+        return Task.FromResult(content);
+    }
+
+    public Task<Content.Content> UpdateContentAsync(
+        Content.Content content,
+        CancellationToken cancellationToken = default)
+    {
+        var index = Contents.FindIndex(c => c.Id == content.Id);
+        if (index >= 0)
         {
-            Key = key,
-            Type = type,
-            Title = title,
-            RendererKey = type
-        };
+            Contents[index] = content;
+        }
+        return Task.FromResult(content);
+    }
 
-        Containers.Add(container);
-
-        return Task.FromResult(container);
+    public Task DeleteContentAsync(
+        Guid contentId,
+        CancellationToken cancellationToken = default)
+    {
+        var content = Contents.FirstOrDefault(c => c.Id == contentId);
+        if (content is not null)
+        {
+            content.Status = "archived";
+        }
+        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<Post>> GetPostsAsync(
@@ -93,7 +123,7 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         string? metadataJson = null,
         CancellationToken cancellationToken = default)
     {
-        var containerType = Containers.FirstOrDefault(container => container.Id == containerId)?.Type;
+        var containerType = Contents.FirstOrDefault(c => c.Id == containerId)?.ContentType;
         var post = new Post
         {
             ContainerId = containerId,
@@ -145,7 +175,6 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         {
             Posts[index] = post;
         }
-
         return Task.FromResult(post);
     }
 
@@ -164,45 +193,9 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
             return PostTypes.Comment;
         }
 
-        return containerType == ContainerTypes.Forum
+        return containerType == ContentTypes.ForumContainer
             ? PostTypes.Thread
             : PostTypes.Post;
-    }
-
-    public Task<IReadOnlyList<ContentItem>> GetContentByContainerAsync(
-        Guid containerId,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult<IReadOnlyList<ContentItem>>(
-            ContentItems.Where(c => c.ContainerId == containerId).ToList());
-    }
-
-    public Task<ContentItem?> GetContentByIdAsync(
-        Guid contentItemId,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(ContentItems.FirstOrDefault(c => c.Id == contentItemId));
-    }
-
-    public Task<ContentItem> CreateContentAsync(
-        ContentItem item,
-        CancellationToken cancellationToken = default)
-    {
-        ContentItems.Add(item);
-        return Task.FromResult(item);
-    }
-
-    public Task DeleteContentAsync(
-        Guid contentItemId,
-        CancellationToken cancellationToken = default)
-    {
-        var item = ContentItems.FirstOrDefault(content => content.Id == contentItemId);
-        if (item is not null)
-        {
-            item.Status = "archived";
-        }
-
-        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<FileObject>> GetFilesByContainerAsync(
@@ -214,23 +207,23 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
                 .Select(file => new
                 {
                     FileRecord = file,
-                    ContentItem = ContentItems.FirstOrDefault(content => content.Id == file.ContentItemId)
+                    Content = Contents.FirstOrDefault(content => content.Id == file.ContentId)
                 })
-                .Where(row => row.ContentItem is not null)
-                .Where(row => row.ContentItem!.ContainerId == containerId)
-                .Where(row => row.ContentItem!.ContentType == FileContentTypes.File)
-                .Where(row => row.ContentItem!.Status != "archived")
-                .OrderByDescending(row => row.ContentItem!.UpdatedAt)
-                .Select(row => new FileObject(row.ContentItem!, row.FileRecord))
+                .Where(row => row.Content is not null)
+                .Where(row => row.Content!.ParentId == containerId)
+                .Where(row => row.Content!.ContentType == FileContentTypes.File)
+                .Where(row => row.Content!.Status != "archived")
+                .OrderByDescending(row => row.Content!.UpdatedAt)
+                .Select(row => new FileObject(row.Content!, row.FileRecord))
                 .ToList());
     }
 
     public Task<FileObject?> GetFileByContentIdAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        var file = FileRecords.FirstOrDefault(candidate => candidate.ContentItemId == contentItemId);
-        var content = ContentItems.FirstOrDefault(candidate => candidate.Id == contentItemId);
+        var file = FileRecords.FirstOrDefault(candidate => candidate.ContentId == contentId);
+        var content = Contents.FirstOrDefault(candidate => candidate.Id == contentId);
         if (file is null || content is null || content.Status == "archived")
         {
             return Task.FromResult<FileObject?>(null);
@@ -244,81 +237,40 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         CancellationToken cancellationToken = default)
     {
         FileRecords.Add(fileRecord);
-        var content = ContentItems.First(content => content.Id == fileRecord.ContentItemId);
+        var content = Contents.First(c => c.Id == fileRecord.ContentId);
         return Task.FromResult(new FileObject(content, fileRecord));
     }
 
-    public Task<IReadOnlyList<BusinessEntity>> GetEntitiesByContainerAsync(
-        Guid containerId,
+    public Task<ContentRelationship> CreateContentRelationshipAsync(
+        ContentRelationship relationship,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<IReadOnlyList<BusinessEntity>>(
-            Entities
-                .Where(entity => entity.ContainerId == containerId)
-                .Where(entity => entity.Status != EntityStatuses.Archived)
-                .OrderBy(entity => entity.Title)
-                .ToList());
-    }
-
-    public Task<BusinessEntity?> GetEntityByIdAsync(
-        Guid entityId,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(Entities.FirstOrDefault(entity =>
-            entity.Id == entityId && entity.Status != EntityStatuses.Archived));
-    }
-
-    public Task<BusinessEntity> CreateEntityAsync(
-        BusinessEntity entity,
-        IReadOnlyList<LabelName> labels,
-        CancellationToken cancellationToken = default)
-    {
-        foreach (var labelName in labels)
-        {
-            var label = GetOrCreateLabel(labelName);
-            entity.EntityLabels.Add(new EntityLabel
-            {
-                Entity = entity,
-                EntityId = entity.Id,
-                Label = label,
-                LabelId = label.Id
-            });
-        }
-
-        Entities.Add(entity);
-        return Task.FromResult(entity);
-    }
-
-    public Task<EntityRelationship> CreateEntityRelationshipAsync(
-        EntityRelationship relationship,
-        CancellationToken cancellationToken = default)
-    {
-        relationship.SourceEntity = Entities.FirstOrDefault(entity => entity.Id == relationship.SourceEntityId);
-        relationship.TargetEntity = Entities.FirstOrDefault(entity => entity.Id == relationship.TargetEntityId);
-        EntityRelationships.Add(relationship);
-        relationship.SourceEntity?.SourceRelationships.Add(relationship);
-        relationship.TargetEntity?.TargetRelationships.Add(relationship);
+        relationship.SourceContent = Contents.FirstOrDefault(c => c.Id == relationship.SourceContentId);
+        relationship.TargetContent = Contents.FirstOrDefault(c => c.Id == relationship.TargetContentId);
+        ContentRelationships.Add(relationship);
+        relationship.SourceContent?.SourceRelationships.Add(relationship);
+        relationship.TargetContent?.TargetRelationships.Add(relationship);
         return Task.FromResult(relationship);
     }
 
     public Task AddLabelToContentAsync(
-        Guid contentItemId,
+        Guid contentId,
         LabelName label,
         CancellationToken cancellationToken = default)
     {
-        var content = ContentItems.FirstOrDefault(item => item.Id == contentItemId);
+        var content = Contents.FirstOrDefault(item => item.Id == contentId);
         if (content is null)
         {
             return Task.CompletedTask;
         }
 
-        var entity = GetOrCreateLabel(label);
+        var labelEntity = GetOrCreateLabel(label);
         content.ContentLabels.Add(new ContentLabel
         {
-            ContentItem = content,
-            ContentItemId = content.Id,
-            Label = entity,
-            LabelId = entity.Id
+            Content = content,
+            ContentId = content.Id,
+            Label = labelEntity,
+            LabelId = labelEntity.Id
         });
         return Task.CompletedTask;
     }
@@ -334,33 +286,11 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
             return Task.CompletedTask;
         }
 
-        var entity = GetOrCreateLabel(label);
+        var labelEntity = GetOrCreateLabel(label);
         post.PostLabels.Add(new PostLabel
         {
             Post = post,
             PostId = post.Id,
-            Label = entity,
-            LabelId = entity.Id
-        });
-        return Task.CompletedTask;
-    }
-
-    public Task AddLabelToEntityAsync(
-        Guid entityId,
-        LabelName label,
-        CancellationToken cancellationToken = default)
-    {
-        var item = Entities.FirstOrDefault(entity => entity.Id == entityId);
-        if (item is null)
-        {
-            return Task.CompletedTask;
-        }
-
-        var labelEntity = GetOrCreateLabel(label);
-        item.EntityLabels.Add(new EntityLabel
-        {
-            Entity = item,
-            EntityId = item.Id,
             Label = labelEntity,
             LabelId = labelEntity.Id
         });
@@ -383,18 +313,6 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         };
         Labels.Add(label);
         return label;
-    }
-
-    public Task<ContentItem> UpdateContentAsync(
-        ContentItem item,
-        CancellationToken cancellationToken = default)
-    {
-        var index = ContentItems.FindIndex(c => c.Id == item.Id);
-        if (index >= 0)
-        {
-            ContentItems[index] = item;
-        }
-        return Task.FromResult(item);
     }
 
     public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(

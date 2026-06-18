@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using OpenTelemetry.Metrics;
 using WorkplaceIQ.AspNet;
 using WorkplaceIQ.AspNet.Files;
 using WorkplaceIQ.AspNet.Data;
 using WorkplaceIQ.Web;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -23,11 +24,11 @@ builder.Services.AddWorkplaceIqAspNet(options =>
         ?? "Data Source=workplaceiq.db"));
 
 builder.Services.AddOpenTelemetry()
-    .WithMetrics(metrics => metrics
-        .AddMeter("WorkplaceIQ")
-        .AddConsoleExporter());
+    .WithMetrics(metrics => metrics.AddMeter("WorkplaceIQ"));
 
 var app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

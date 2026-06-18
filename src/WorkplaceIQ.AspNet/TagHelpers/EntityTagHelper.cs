@@ -1,15 +1,12 @@
 using Microsoft.AspNetCore.Razor.TagHelpers;
-using Microsoft.Extensions.Hosting;
 using WorkplaceIQ.AspNet.Rendering;
 using WorkplaceIQ.Entities;
 
 namespace WorkplaceIQ.AspNet.TagHelpers;
 
 [HtmlTargetElement("iq-entity")]
-[HtmlTargetElement("iq-entity-list")]
 public sealed class EntityTagHelper(
     IEntityComponentService entityComponentService,
-    IHostEnvironment environment,
     ComponentHtmlRenderer renderer) : TagHelper
 {
     [HtmlAttributeName("id")]
@@ -19,22 +16,38 @@ public sealed class EntityTagHelper(
 
     public string Type { get; set; } = "Entity";
 
+    [HtmlAttributeName("container")]
+    public string? ContainerName { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
-        var result = await entityComponentService.ResolveEntitiesAsync(
-            new EntityComponentRequest(Id, Title, Type, environment.IsDevelopment()));
+        var content = string.IsNullOrWhiteSpace(Id)
+            ? null
+            : await entityComponentService.ResolveDetailAsync(Id);
 
         output.TagName = "section";
         output.TagMode = TagMode.StartTagAndEndTag;
-        output.Attributes.SetAttribute("class", "iq-entity-list");
-        output.Attributes.SetAttribute("data-iq-entity-list-id", Id);
-        output.Attributes.SetAttribute("data-iq-entity-type", result.EntityType);
+        output.Attributes.SetAttribute("class", "iq-entity");
+        output.Attributes.SetAttribute("data-iq-entity-id", Id);
+        output.Attributes.SetAttribute("data-iq-entity-type", Type);
 
-        if (result.Missing)
+        if (!string.IsNullOrWhiteSpace(ContainerName))
         {
-            output.Attributes.SetAttribute("data-iq-missing", "true");
+            output.Attributes.SetAttribute("data-iq-entity-container", ContainerName);
         }
 
-        output.Content.SetHtmlContent(renderer.RenderEntities(result.DisplayTitle, result.EntityType, result.Entities));
+        if (content is null)
+        {
+            output.Attributes.SetAttribute("data-iq-missing", "true");
+            output.Content.SetHtmlContent(renderer.RenderEntityDetail(new Content.Content
+            {
+                Name = Id,
+                Title = string.IsNullOrWhiteSpace(Title) ? Id : Title,
+                ContentType = Type
+            }));
+            return;
+        }
+
+        output.Content.SetHtmlContent(renderer.RenderEntityDetail(content));
     }
 }

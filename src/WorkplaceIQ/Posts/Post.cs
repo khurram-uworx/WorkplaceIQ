@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
 
@@ -15,7 +16,7 @@ public sealed class Post
     public Guid? ContentId { get; set; }
 
     [ForeignKey(nameof(ContentId))]
-    public ContentItem? Content { get; set; }
+    public Content.Content? Content { get; set; }
 
     [Required]
     [MaxLength(32)]

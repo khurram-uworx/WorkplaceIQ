@@ -9,10 +9,10 @@ public sealed class FileRecord
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public Guid ContentItemId { get; set; }
+    public Guid ContentId { get; set; }
 
-    [ForeignKey(nameof(ContentItemId))]
-    public ContentItem? ContentItem { get; set; }
+    [ForeignKey(nameof(ContentId))]
+    public Content.Content? Content { get; set; }
 
     [Required]
     [MaxLength(512)]

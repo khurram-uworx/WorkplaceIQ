@@ -1,5 +1,5 @@
 using WorkplaceIQ.Components;
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
 
 namespace WorkplaceIQ.Entities;
@@ -20,14 +20,14 @@ public sealed class EntityComponentService(
             new ComponentRequest(
                 request.Id,
                 request.Title ?? string.Empty,
-                ContainerTypes.EntityList,
+                ContentTypes.EntityContainer,
                 request.AutoProvision,
                 "entity list"),
             cancellationToken);
 
         var entities = result.Container is null
             ? []
-            : await store.GetEntitiesByContainerAsync(result.Container.Id, cancellationToken);
+            : await store.GetChildrenAsync(result.Container.Id, cancellationToken: cancellationToken);
 
         return new EntityComponentResult(
             result.Container,
@@ -38,7 +38,14 @@ public sealed class EntityComponentService(
             entityType);
     }
 
-    public async Task<BusinessEntity> CreateEntityAsync(
+    public Task<Content.Content?> ResolveDetailAsync(
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        return store.GetContentByNameAsync(name, cancellationToken);
+    }
+
+    public async Task<Content.Content> CreateEntityAsync(
         EntityCreateRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -47,9 +54,8 @@ public sealed class EntityComponentService(
         var name = RequireValue(request.Name, "An entity name is required.", nameof(request));
         var title = RequireValue(request.Title, "An entity title is required.", nameof(request));
 
-        var container = await store.GetContainerByKeyAsync(
+        var container = await store.GetContentByNameAsync(
             listId,
-            ContainerTypes.EntityList,
             cancellationToken);
 
         if (container is null)
@@ -58,52 +64,57 @@ public sealed class EntityComponentService(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var entity = new BusinessEntity
+        var entity = new Content.Content
         {
-            ContainerId = container.Id,
-            EntityType = entityType,
+            ParentId = container.Id,
+            ContentType = entityType,
             Name = name,
             Title = title,
+            Body = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            Status = string.IsNullOrWhiteSpace(request.Status) ? EntityStatuses.Active : request.Status.Trim(),
+            Status = string.IsNullOrWhiteSpace(request.Status) ? "active" : request.Status.Trim(),
             MetadataJson = string.IsNullOrWhiteSpace(request.MetadataJson) ? null : request.MetadataJson,
             CreatedAt = now,
             UpdatedAt = now
         };
 
-        return await store.CreateEntityAsync(
-            entity,
-            LabelName.ParseList(request.Labels),
-            cancellationToken);
+        var created = await store.CreateContentAsync(entity, cancellationToken);
+
+        foreach (var label in LabelName.ParseList(request.Labels))
+        {
+            await store.AddLabelToContentAsync(created.Id, label, cancellationToken);
+        }
+
+        return created;
     }
 
-    public async Task<EntityRelationship> CreateRelationshipAsync(
-        Guid sourceEntityId,
-        Guid targetEntityId,
+    public async Task<ContentRelationship> CreateRelationshipAsync(
+        Guid sourceContentId,
+        Guid targetContentId,
         string relationshipType,
         string? metadataJson = null,
         CancellationToken cancellationToken = default)
     {
-        if (sourceEntityId == targetEntityId)
+        if (sourceContentId == targetContentId)
         {
-            throw new ArgumentException("An entity relationship requires two different entities.", nameof(targetEntityId));
+            throw new ArgumentException("A relationship requires two different entities.", nameof(targetContentId));
         }
 
-        var normalizedType = RequireValue(relationshipType, "An entity relationship type is required.", nameof(relationshipType));
+        var normalizedType = RequireValue(relationshipType, "A relationship type is required.", nameof(relationshipType));
 
-        var source = await store.GetEntityByIdAsync(sourceEntityId, cancellationToken);
-        var target = await store.GetEntityByIdAsync(targetEntityId, cancellationToken);
+        var source = await store.GetContentByIdAsync(sourceContentId, cancellationToken);
+        var target = await store.GetContentByIdAsync(targetContentId, cancellationToken);
 
         if (source is null || target is null)
         {
             throw new InvalidOperationException("Both entities must exist before a relationship can be created.");
         }
 
-        return await store.CreateEntityRelationshipAsync(
-            new EntityRelationship
+        return await store.CreateContentRelationshipAsync(
+            new ContentRelationship
             {
-                SourceEntityId = sourceEntityId,
-                TargetEntityId = targetEntityId,
+                SourceContentId = sourceContentId,
+                TargetContentId = targetContentId,
                 RelationshipType = normalizedType,
                 MetadataJson = metadataJson
             },

@@ -22,14 +22,14 @@ internal sealed class RecordingFileComponentService(FileComponentResult result) 
     }
 
     public Task<FileObject?> GetFileAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException();
     }
 
     public Task<Stream> OpenReadAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException();

@@ -1,4 +1,4 @@
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Posts;
 
@@ -15,24 +15,27 @@ public sealed class ComponentService(IWorkplaceIqStore store) : IComponentServic
             ? componentId
             : request.Title.Trim();
 
-        var container = await store.GetContainerByKeyAsync(
+        var content = await store.GetContentByNameAsync(
             componentId,
-            request.ContainerType,
             cancellationToken);
 
         var created = false;
 
-        if (container is null && request.AutoProvision)
+        if (content is null && request.AutoProvision)
         {
-            container = await store.CreateContainerAsync(
-                componentId,
-                request.ContainerType,
-                initialTitle,
-                cancellationToken);
+            content = new Content.Content
+            {
+                Name = componentId,
+                ContentType = request.ContainerType,
+                Title = initialTitle,
+                RendererKey = request.ContainerType,
+                IsSystemGenerated = false
+            };
+            content = await store.CreateContentAsync(content, cancellationToken);
             created = true;
         }
 
-        if (container is null)
+        if (content is null)
         {
             return new ComponentResult(
                 null,
@@ -42,14 +45,14 @@ public sealed class ComponentService(IWorkplaceIqStore store) : IComponentServic
                 initialTitle);
         }
 
-        var posts = await store.GetPostsAsync(container.Id, cancellationToken);
+        var posts = await store.GetPostsAsync(content.Id, cancellationToken);
 
         return new ComponentResult(
-            container,
+            content,
             posts,
             created,
             false,
-            container.Title);
+            content.Title);
     }
 
     public async Task<Post> CreatePostAsync(
@@ -67,18 +70,17 @@ public sealed class ComponentService(IWorkplaceIqStore store) : IComponentServic
         var normalizedTitle = RequireValue(title, $"A {componentName} post title is required.", nameof(title));
         var normalizedBody = RequireValue(body, $"A {componentName} post body is required.", nameof(body));
 
-        var container = await store.GetContainerByKeyAsync(
+        var content = await store.GetContentByNameAsync(
             normalizedComponentId,
-            containerType,
             cancellationToken);
 
-        if (container is null)
+        if (content is null)
         {
             throw new InvalidOperationException($"{ToDisplayName(componentName)} '{normalizedComponentId}' does not exist.");
         }
 
         return await store.CreatePostAsync(
-            container.Id,
+            content.Id,
             normalizedTitle,
             normalizedBody,
             LabelName.ParseList(labels),

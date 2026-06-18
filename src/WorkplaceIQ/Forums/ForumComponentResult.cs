@@ -1,10 +1,10 @@
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Forums;
 
 public sealed record ForumComponentResult(
-    Container? Container,
+    Content.Content? Container,
     IReadOnlyList<Post> Posts,
     bool Created,
     bool Missing,

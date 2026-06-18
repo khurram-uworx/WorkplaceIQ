@@ -1,5 +1,4 @@
 using WorkplaceIQ.Components;
-using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
 
@@ -18,7 +17,7 @@ public sealed class FileComponentService(
             new ComponentRequest(
                 request.Id,
                 request.Title ?? string.Empty,
-                ContainerTypes.Files,
+                ContentTypes.FileContainer,
                 request.AutoProvision,
                 "files"),
             cancellationToken);
@@ -46,15 +45,15 @@ public sealed class FileComponentService(
             throw new ArgumentException("A non-empty file is required.", nameof(request.SizeBytes));
         }
 
-        var container = await store.GetContainerByKeyAsync(filesId, ContainerTypes.Files, cancellationToken)
+        var container = await store.GetContentByNameAsync(filesId, cancellationToken)
             ?? throw new InvalidOperationException($"Files library '{filesId}' does not exist.");
 
         await storage.EnsureBucketAsync(cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
-        var contentItem = new ContentItem
+        var content = new Content.Content
         {
-            ContainerId = container.Id,
+            ParentId = container.Id,
             ContentType = FileContentTypes.File,
             Name = CreateContentName(fileName),
             Title = string.IsNullOrWhiteSpace(request.Title) ? fileName : request.Title.Trim(),
@@ -66,7 +65,7 @@ public sealed class FileComponentService(
             SearchText = fileName
         };
 
-        var createdContent = await store.CreateContentAsync(contentItem, cancellationToken);
+        var createdContent = await store.CreateContentAsync(content, cancellationToken);
         foreach (var label in LabelName.ParseList(request.Labels))
         {
             await store.AddLabelToContentAsync(createdContent.Id, label, cancellationToken);
@@ -84,7 +83,7 @@ public sealed class FileComponentService(
 
             var fileRecord = new FileRecord
             {
-                ContentItemId = createdContent.Id,
+                ContentId = createdContent.Id,
                 FileName = fileName,
                 ContentType = NormalizeContentType(request.ContentType),
                 SizeBytes = request.SizeBytes,
@@ -106,18 +105,18 @@ public sealed class FileComponentService(
     }
 
     public Task<FileObject?> GetFileAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        return store.GetFileByContentIdAsync(contentItemId, cancellationToken);
+        return store.GetFileByContentIdAsync(contentId, cancellationToken);
     }
 
     public async Task<Stream> OpenReadAsync(
-        Guid contentItemId,
+        Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        var file = await store.GetFileByContentIdAsync(contentItemId, cancellationToken)
-            ?? throw new InvalidOperationException($"File content '{contentItemId}' not found.");
+        var file = await store.GetFileByContentIdAsync(contentId, cancellationToken)
+            ?? throw new InvalidOperationException($"File content '{contentId}' not found.");
 
         return await storage.OpenReadAsync(file.FileRecord, cancellationToken);
     }
@@ -147,9 +146,9 @@ public sealed class FileComponentService(
             : name.Trim().Replace(' ', '-').ToLowerInvariant();
     }
 
-    private static string CreateObjectKey(string filesId, Guid contentItemId, string fileName)
+    private static string CreateObjectKey(string filesId, Guid contentId, string fileName)
     {
         var safeFileName = Uri.EscapeDataString(fileName);
-        return $"containers/{filesId}/content/{contentItemId:N}/original/{safeFileName}";
+        return $"containers/{filesId}/content/{contentId:N}/original/{safeFileName}";
     }
 }

@@ -1,10 +1,10 @@
-using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 
 namespace WorkplaceIQ.Entities;
 
 public sealed record EntityComponentResult(
-    Container? Container,
-    IReadOnlyList<BusinessEntity> Entities,
+    Content.Content? Container,
+    IReadOnlyList<Content.Content> Entities,
     bool Created,
     bool Missing,
     string DisplayTitle,

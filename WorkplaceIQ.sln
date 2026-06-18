@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkplaceIQ.Tests", "tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkplaceIQ.AspNet", "src\WorkplaceIQ.AspNet\WorkplaceIQ.AspNet.csproj", "{F5964216-7EE8-447E-B429-BE9AD69F3ED7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkplaceIQ.ServiceDefaults", "src\WorkplaceIQ.ServiceDefaults\WorkplaceIQ.ServiceDefaults.csproj", "{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,18 @@ Global
 		{F5964216-7EE8-447E-B429-BE9AD69F3ED7}.Release|x64.Build.0 = Release|Any CPU
 		{F5964216-7EE8-447E-B429-BE9AD69F3ED7}.Release|x86.ActiveCfg = Release|Any CPU
 		{F5964216-7EE8-447E-B429-BE9AD69F3ED7}.Release|x86.Build.0 = Release|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Debug|x64.Build.0 = Debug|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Debug|x86.Build.0 = Debug|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|x64.ActiveCfg = Release|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|x64.Build.0 = Release|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|x86.ActiveCfg = Release|Any CPU
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,5 +96,6 @@ Global
 		{D69A42E9-E897-4D73-AFF7-E8EB9B676089} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{79F80724-6620-42B8-88E7-659EADD92D5A} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{F5964216-7EE8-447E-B429-BE9AD69F3ED7} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{6E16EEA1-D749-4CE7-B188-E3F6F02E2414} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
