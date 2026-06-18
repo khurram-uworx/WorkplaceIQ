@@ -23,6 +23,21 @@ public sealed class MetricTagHelper(
     [HtmlAttributeName("container-type")]
     public string ContainerType { get; set; } = "feed";
 
+    [HtmlAttributeName("content-type")]
+    public string? ContentType { get; set; }
+
+    [HtmlAttributeName("source-field")]
+    public string? SourceField { get; set; }
+
+    [HtmlAttributeName("window")]
+    public string? Window { get; set; }
+
+    [HtmlAttributeName("unit")]
+    public string? Unit { get; set; }
+
+    [HtmlAttributeName("display-unit")]
+    public string? DisplayUnit { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         output.TagName = "div";
@@ -46,7 +61,15 @@ public sealed class MetricTagHelper(
                 containerId = container?.Id;
             }
 
-            result = await metricService.ComputeAsync(Name, containerId);
+            result = await metricService.ComputeAsync(new MetricRequest(
+                Name.Trim(),
+                containerId,
+                ContainerType,
+                ContentType,
+                SourceField,
+                Window,
+                Unit,
+                DisplayUnit));
         }
         catch (Exception)
         {

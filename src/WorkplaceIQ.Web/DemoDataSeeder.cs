@@ -111,45 +111,47 @@ internal static class DemoDataSeeder
             outagesContainer = await store.CreateContainerAsync("PowerOutages", "feed", "Power Outages in Factory");
         }
 
-        var existingOutageContent = await store.GetContentByContainerAsync(outagesContainer.Id);
-        if (existingOutageContent.Count == 0)
+        var outages = new[]
         {
-            var outages = new[]
-            {
-                (title: "Generator 3 voltage spike", severity: "High", duration: 5400, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 1),
-                (title: "Main breaker trip", severity: "Critical", duration: 7200, machine: "Main-Breaker-A", location: "Factory A", shift: "Day", ago: 2),
-                (title: "Cooling system failure", severity: "Medium", duration: 3600, machine: "Cooling-Unit-2", location: "Factory B", shift: "Night", ago: 3),
-                (title: "Generator 3 overload", severity: "High", duration: 4800, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 4),
-                (title: "Transformer outage", severity: "High", duration: 9000, machine: "Transformer-1", location: "Factory A", shift: "Day", ago: 5),
-                (title: "UPS battery failure", severity: "Medium", duration: 1800, machine: "UPS-3", location: "Factory B", shift: "Night", ago: 6),
-                (title: "Generator 3 shutdown", severity: "Critical", duration: 10800, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 7),
-                (title: "Power line maintenance", severity: "Low", duration: 2400, machine: "Line-Main", location: "Factory A", shift: "Day", ago: 10),
-                (title: "Voltage fluctuation", severity: "Medium", duration: 1200, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 12),
-                (title: "Emergency stop triggered", severity: "Critical", duration: 3600, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 14),
-                (title: "Coolant leak", severity: "High", duration: 5400, machine: "Cooling-Unit-1", location: "Factory B", shift: "Day", ago: 20),
-                (title: "Routine breaker test", severity: "Low", duration: 900, machine: "Breaker-2", location: "Factory A", shift: "Day", ago: 25),
-            };
+            (title: "Generator 3 voltage spike", severity: "High", duration: 5400, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 1),
+            (title: "Main breaker trip", severity: "Critical", duration: 7200, machine: "Main-Breaker-A", location: "Factory A", shift: "Day", ago: 2),
+            (title: "Cooling system failure", severity: "Medium", duration: 3600, machine: "Cooling-Unit-2", location: "Factory B", shift: "Night", ago: 3),
+            (title: "Generator 3 overload", severity: "High", duration: 4800, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 4),
+            (title: "Transformer outage", severity: "High", duration: 9000, machine: "Transformer-1", location: "Factory A", shift: "Day", ago: 5),
+            (title: "UPS battery failure", severity: "Medium", duration: 1800, machine: "UPS-3", location: "Factory B", shift: "Night", ago: 6),
+            (title: "Generator 3 shutdown", severity: "Critical", duration: 10800, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 7),
+            (title: "Power line maintenance", severity: "Low", duration: 2400, machine: "Line-Main", location: "Factory A", shift: "Day", ago: 10),
+            (title: "Voltage fluctuation", severity: "Medium", duration: 1200, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 12),
+            (title: "Emergency stop triggered", severity: "Critical", duration: 3600, machine: "Generator-3", location: "Factory A", shift: "Night", ago: 14),
+            (title: "Coolant leak", severity: "High", duration: 5400, machine: "Cooling-Unit-1", location: "Factory B", shift: "Day", ago: 20),
+            (title: "Routine breaker test", severity: "Low", duration: 900, machine: "Breaker-2", location: "Factory A", shift: "Day", ago: 25),
+        };
 
-            foreach (var (title, severity, duration, machine, location, shift, ago) in outages)
-            {
-                var createdAt = DateTimeOffset.UtcNow.AddDays(-ago);
-                var metadata = $"{{\"durationSeconds\":{duration},\"machineId\":\"{machine}\",\"location\":\"{location}\",\"shift\":\"{shift}\",\"severity\":\"{severity}\"}}";
-                var publishedAt = createdAt.AddMinutes(5);
+        var existingOutageContent = await store.GetContentByContainerAsync(outagesContainer.Id);
+        foreach (var (title, severity, duration, machine, location, shift, ago) in outages)
+        {
+            var createdAt = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(-ago), TimeSpan.Zero);
+            var metadata = $"{{\"durationSeconds\":{duration},\"machineId\":\"{machine}\",\"location\":\"{location}\",\"shift\":\"{shift}\",\"severity\":\"{severity}\"}}";
+            var name = title.ToLowerInvariant().Replace(' ', '-');
+            var existing = existingOutageContent.FirstOrDefault(item => item.Name == name);
 
-                var item = await contentService.CreateAsync(
+            if (existing is null)
+            {
+                existing = await contentService.CreateAsync(
                     outagesContainer.Id,
                     "Outage",
-                    title.ToLowerInvariant().Replace(' ', '-'),
+                    name,
                     title,
                     $"Generator {machine} experienced a {severity.ToLowerInvariant()}-severity outage during {shift.ToLowerInvariant()} shift in {location}. Duration: {duration / 60} minutes.",
                     authorUserId: "system",
                     metadataJson: metadata);
-
-                // Set actual createdAt/publishedAt
-                item.CreatedAt = createdAt;
-                item.PublishedAt = publishedAt;
-                await store.UpdateContentAsync(item);
             }
+
+            existing.CreatedAt = createdAt;
+            existing.UpdatedAt = createdAt;
+            existing.PublishedAt = createdAt.AddMinutes(5);
+            existing.MetadataJson = metadata;
+            await store.UpdateContentAsync(existing);
         }
 
         // --- Seed Metric Definitions ---
@@ -159,43 +161,21 @@ internal static class DemoDataSeeder
             dbContext.MetricDefinitions.AddRange(
                 new MetricDefinition
                 {
-                    Name = "OutageCount",
+                    Name = MetricNames.ContainerContentCount,
                     ContainerType = "feed",
-                    InstrumentKind = "Counter",
+                    InstrumentKind = "Gauge",
                     Aggregation = "Count",
                     Unit = "count",
-                    Description = "Total number of power outage records"
+                    Description = "Content item count by container"
                 },
                 new MetricDefinition
                 {
-                    Name = "OutageCountLast7Days",
+                    Name = MetricNames.MetadataSum,
                     ContainerType = "feed",
-                    InstrumentKind = "Counter",
-                    Aggregation = "Count",
-                    Unit = "count",
-                    Description = "Number of power outage records in the last 7 days"
-                },
-                new MetricDefinition
-                {
-                    Name = "TotalOutageTime",
-                    ContainerType = "feed",
-                    InstrumentKind = "Histogram",
-                    SourceField = "durationSeconds",
+                    InstrumentKind = "Gauge",
                     Aggregation = "Sum",
                     Unit = "seconds",
-                    DisplayUnit = "hours",
-                    Description = "Total outage duration in seconds"
-                },
-                new MetricDefinition
-                {
-                    Name = "TotalOutageTimeLast7Days",
-                    ContainerType = "feed",
-                    InstrumentKind = "Histogram",
-                    SourceField = "durationSeconds",
-                    Aggregation = "Sum",
-                    Unit = "seconds",
-                    DisplayUnit = "hours",
-                    Description = "Total outage duration in the last 7 days"
+                    Description = "Metadata field sum by container"
                 }
             );
             await dbContext.SaveChangesAsync();

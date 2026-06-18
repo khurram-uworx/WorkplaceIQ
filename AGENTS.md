@@ -23,6 +23,11 @@ dotnet test --configuration Release
 
 The repo may use the latest installed .NET SDK, including preview SDKs, while projects still target `net10.0`.
 
+## Shell Tools
+
+- Linux-style command-line tools are available directly from PowerShell and can be used when they make debugging faster, including `rg`, `grep`, `awk`, `sed`, and related coreutils.
+- Do not wrap commands in `bash`; WSL may not have a distro installed. Call the available tools directly.
+
 ## Current Shape
 
 - `src\WorkplaceIQ` owns core entities and service contracts.

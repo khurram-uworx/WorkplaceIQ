@@ -22,6 +22,22 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Container>> GetContainersAsync(
+        string? type = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.Containers.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            query = query.Where(container => container.Type == type);
+        }
+
+        return await query
+            .OrderBy(container => container.Title)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Container> CreateContainerAsync(
         string key,
         string type,

@@ -1,315 +1,126 @@
 namespace WorkplaceIQ.Tests.Services;
 
-using System.Linq.Expressions;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using WorkplaceIQ.Containers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Tests.TestDoubles;
 
 public class MetricServiceTests
 {
-    private static readonly Guid ContainerId = Guid.NewGuid();
-
     [Test]
-    public async Task ComputeAsync_ReturnsZero_WhenDefinitionNotFound()
+    public async Task ComputeAsync_ReturnsContentCountForSourceContainer()
     {
         var store = new InMemoryWorkplaceIqStore();
+        var container = await store.CreateContainerAsync("FactoryPowerOutages", ContainerTypes.Feed, "Factory Power Outages");
+        AddContentItem(store, container.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
+        AddContentItem(store, container.Id, "Policy", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
 
-        var result = await service.ComputeAsync("NonExistentMetric", ContainerId);
+        var result = await service.ComputeAsync(new MetricRequest(
+            MetricNames.ContainerContentCount,
+            ContainerId: container.Id,
+            ContainerType: ContainerTypes.Feed,
+            ContentType: "Outage",
+            Window: "last_7_days"));
 
-        Assert.That(result.Value, Is.EqualTo(0));
+        Assert.That(result.Value, Is.EqualTo(1));
         Assert.That(result.Unit, Is.EqualTo("count"));
-        Assert.That(result.DisplayValue, Is.EqualTo("0"));
-        Assert.That(result.DisplayUnit, Is.Null);
+        Assert.That(result.Tags["container.key"], Is.EqualTo("FactoryPowerOutages"));
+        Assert.That(result.Tags["content.type"], Is.EqualTo("Outage"));
+        Assert.That(result.Tags["window"], Is.EqualTo("last_7_days"));
     }
 
     [Test]
-    public async Task ComputeAsync_ReturnsZero_WhenNoItemsInContainer()
+    public async Task ComputeAsync_ReturnsMetadataSumWithDisplayUnit()
     {
         var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "TestCount",
-            InstrumentKind = "Counter",
-            Aggregation = "Count",
-            Unit = "count"
-        });
+        var container = await store.CreateContainerAsync("FactoryPowerOutages", ContainerTypes.Feed, "Factory Power Outages");
+        AddContentItem(store, container.Id, "Outage", durationSeconds: 3600, createdAt: DateTimeOffset.UtcNow.AddDays(-1));
+        AddContentItem(store, container.Id, "Outage", durationSeconds: 7200, createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
 
-        var result = await service.ComputeAsync("TestCount", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(0));
-        Assert.That(result.DisplayValue, Is.Null);
-    }
-
-    [Test]
-    public async Task ComputeAsync_ReturnsCount_WhenAggregationIsCount()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "ItemCount",
-            InstrumentKind = "Counter",
-            Aggregation = "Count",
-            Unit = "count"
-        });
-        AddContentItems(store, 5);
-        var service = CreateMetricService(store);
-
-        var result = await service.ComputeAsync("ItemCount", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(5));
-    }
-
-    [Test]
-    public async Task ComputeAsync_ReturnsSum_WhenAggregationIsSum()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "TotalDuration",
-            InstrumentKind = "Histogram",
-            Aggregation = "Sum",
-            SourceField = "durationSeconds",
-            Unit = "seconds"
-        });
-        AddContentItems(store, 3, durationSeconds: [10, 20, 30]);
-        var service = CreateMetricService(store);
-
-        var result = await service.ComputeAsync("TotalDuration", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(60));
-    }
-
-    [Test]
-    public async Task ComputeAsync_ReturnsAverage_WhenAggregationIsAvg()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "AvgDuration",
-            InstrumentKind = "Histogram",
-            Aggregation = "Avg",
-            SourceField = "durationSeconds",
-            Unit = "seconds"
-        });
-        AddContentItems(store, 4, durationSeconds: [10, 20, 30, 40]);
-        var service = CreateMetricService(store);
-
-        var result = await service.ComputeAsync("AvgDuration", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(25));
-    }
-
-    [Test]
-    public async Task ComputeAsync_ReturnsMin_WhenAggregationIsMin()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "MinDuration",
-            InstrumentKind = "Histogram",
-            Aggregation = "Min",
-            SourceField = "durationSeconds",
-            Unit = "seconds"
-        });
-        AddContentItems(store, 3, durationSeconds: [50, 10, 30]);
-        var service = CreateMetricService(store);
-
-        var result = await service.ComputeAsync("MinDuration", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(10));
-    }
-
-    [Test]
-    public async Task ComputeAsync_ReturnsMax_WhenAggregationIsMax()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "MaxDuration",
-            InstrumentKind = "Histogram",
-            Aggregation = "Max",
-            SourceField = "durationSeconds",
-            Unit = "seconds"
-        });
-        AddContentItems(store, 3, durationSeconds: [5, 15, 25]);
-        var service = CreateMetricService(store);
-
-        var result = await service.ComputeAsync("MaxDuration", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(25));
-    }
-
-    [Test]
-    public async Task ComputeAsync_ReturnsConvertedDisplayValue_WhenDisplayUnitSet()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "TotalDurationHours",
-            InstrumentKind = "Histogram",
-            Aggregation = "Sum",
-            SourceField = "durationSeconds",
-            Unit = "seconds",
-            DisplayUnit = "hours"
-        });
-        AddContentItems(store, 2, durationSeconds: [3600, 7200]);
-        var service = CreateMetricService(store);
-
-        var result = await service.ComputeAsync("TotalDurationHours", ContainerId);
+        var result = await service.ComputeAsync(new MetricRequest(
+            MetricNames.MetadataSum,
+            ContainerId: container.Id,
+            ContainerType: ContainerTypes.Feed,
+            ContentType: "Outage",
+            SourceField: "durationSeconds",
+            Window: "last_7_days",
+            Unit: "seconds",
+            DisplayUnit: "hours"));
 
         Assert.That(result.Value, Is.EqualTo(10800));
         Assert.That(result.DisplayValue, Is.EqualTo("3.0"));
         Assert.That(result.DisplayUnit, Is.EqualTo("hours"));
+        Assert.That(result.Tags["metadata.field"], Is.EqualTo("durationSeconds"));
     }
 
     [Test]
-    public async Task ComputeAsync_AppliesProviderFilter_BeforeAggregation()
+    public async Task ComputeSeriesAsync_ExpandsGenericMetricAcrossMatchingContainers()
     {
         var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "HighSeverityCount",
-            InstrumentKind = "Counter",
-            Aggregation = "Count",
-            Unit = "count"
-        });
-        AddContentItems(store, 3, severities: ["low", "high", "high"]);
-
-        var provider = new TestMetricProvider("HighSeverityCount",
-            item => item.MetadataJson != null && item.MetadataJson.Contains("\"high\""));
-
-        var service = CreateMetricService(store, [provider]);
-
-        var result = await service.ComputeAsync("HighSeverityCount", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(2));
-    }
-
-    [Test]
-    public async Task ComputeAsync_ReturnsSumOverFilteredItems_WithProviderFilter()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "HighSeverityDuration",
-            InstrumentKind = "Histogram",
-            Aggregation = "Sum",
-            SourceField = "durationSeconds",
-            Unit = "seconds"
-        });
-        AddContentItems(store, 4,
-            durationSeconds: [100, 200, 300, 400],
-            severities: ["low", "high", "high", "low"]);
-
-        var provider = new TestMetricProvider("HighSeverityDuration",
-            item => item.MetadataJson != null && item.MetadataJson.Contains("\"high\""));
-
-        var service = CreateMetricService(store, [provider]);
-
-        var result = await service.ComputeAsync("HighSeverityDuration", ContainerId);
-
-        Assert.That(result.Value, Is.EqualTo(500));
-    }
-
-    [Test]
-    public async Task ComputeAsync_SkipsItemsWithMissingMetadataField()
-    {
-        var store = new InMemoryWorkplaceIqStore();
-        store.MetricDefinitions.Add(new MetricDefinition
-        {
-            Name = "SumDuration",
-            InstrumentKind = "Histogram",
-            Aggregation = "Sum",
-            SourceField = "durationSeconds",
-            Unit = "seconds"
-        });
-
-        store.ContentItems.Add(new ContentItem
-        {
-            ContainerId = ContainerId,
-            ContentType = "Outage",
-            Name = "Item-1",
-            Title = "Item 1",
-            Status = "published",
-            MetadataJson = """{"durationSeconds": 100, "severity": "high"}"""
-        });
-        store.ContentItems.Add(new ContentItem
-        {
-            ContainerId = ContainerId,
-            ContentType = "Outage",
-            Name = "Item-2",
-            Title = "Item 2",
-            Status = "published",
-            MetadataJson = """{"severity": "low"}"""
-        });
-        store.ContentItems.Add(new ContentItem
-        {
-            ContainerId = ContainerId,
-            ContentType = "Outage",
-            Name = "Item-3",
-            Title = "Item 3",
-            Status = "published",
-            MetadataJson = """{"durationSeconds": 50, "severity": "medium"}"""
-        });
-
+        var factory = await store.CreateContainerAsync("FactoryPowerOutages", ContainerTypes.Feed, "Factory Power Outages");
+        var office = await store.CreateContainerAsync("OfficePowerOutages", ContainerTypes.Feed, "Office Power Outages");
+        var forum = await store.CreateContainerAsync("MaintenanceForum", ContainerTypes.Forum, "Maintenance Forum");
+        AddContentItem(store, factory.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
+        AddContentItem(store, factory.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-2));
+        AddContentItem(store, office.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
+        AddContentItem(store, forum.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
 
-        var result = await service.ComputeAsync("SumDuration", ContainerId);
+        var series = await service.ComputeSeriesAsync(new MetricRequest(
+            MetricNames.ContainerContentCount,
+            ContainerType: ContainerTypes.Feed,
+            ContentType: "Outage",
+            Window: "last_7_days"));
 
-        Assert.That(result.Value, Is.EqualTo(150));
+        Assert.That(series, Has.Count.EqualTo(2));
+        Assert.That(series.Single(result => (string)result.Tags["container.key"]! == "FactoryPowerOutages").Value, Is.EqualTo(2));
+        Assert.That(series.Single(result => (string)result.Tags["container.key"]! == "OfficePowerOutages").Value, Is.EqualTo(1));
     }
 
-    private static void AddContentItems(
-        InMemoryWorkplaceIqStore store,
-        int count,
-        double[]? durationSeconds = null,
-        string[]? severities = null)
+    [Test]
+    public async Task ComputeAsync_ReturnsZeroWhenProviderIsMissing()
     {
-        for (var i = 0; i < count; i++)
-        {
-            var duration = durationSeconds is not null && i < durationSeconds.Length
-                ? durationSeconds[i]
-                : (double?)(10 * (i + 1));
+        var service = CreateMetricService(new InMemoryWorkplaceIqStore());
 
-            var severity = severities is not null && i < severities.Length
-                ? severities[i]
-                : "medium";
+        var result = await service.ComputeAsync(new MetricRequest("workplaceiq.unknown.metric"));
 
-            store.ContentItems.Add(new ContentItem
-            {
-                ContainerId = ContainerId,
-                ContentType = "Outage",
-                Name = $"Item-{i + 1}",
-                Title = $"Item {i + 1}",
-                Status = "published",
-                MetadataJson = $$"""{"durationSeconds": {{duration}}, "severity": "{{severity}}"}"""
-            });
-        }
+        Assert.That(result.Value, Is.EqualTo(0));
+        Assert.That(result.DisplayValue, Is.EqualTo("0"));
     }
 
-    private static MetricService CreateMetricService(
+    private static void AddContentItem(
         InMemoryWorkplaceIqStore store,
-        IEnumerable<IMetricProvider>? providers = null)
+        Guid containerId,
+        string contentType,
+        double durationSeconds = 0,
+        DateTimeOffset? createdAt = null)
+    {
+        store.ContentItems.Add(new ContentItem
+        {
+            ContainerId = containerId,
+            ContentType = contentType,
+            Name = Guid.NewGuid().ToString("N"),
+            Title = contentType,
+            Status = "published",
+            CreatedAt = createdAt ?? DateTimeOffset.UtcNow,
+            MetadataJson = $$"""{"durationSeconds": {{durationSeconds}}}"""
+        });
+    }
+
+    private static MetricService CreateMetricService(InMemoryWorkplaceIqStore store)
     {
         return new MetricService(
             store,
-            providers ?? [],
+            [
+                new ContentCountMetricProvider(),
+                new MetadataAggregationMetricProvider(MetricNames.MetadataSum, values => values.Sum()),
+                new MetadataAggregationMetricProvider(MetricNames.MetadataAverage, values => values.Average()),
+                new MetadataAggregationMetricProvider(MetricNames.MetadataMin, values => values.Min()),
+                new MetadataAggregationMetricProvider(MetricNames.MetadataMax, values => values.Max())
+            ],
             NullLogger<MetricService>.Instance);
-    }
-
-    private sealed class TestMetricProvider : IMetricProvider
-    {
-        public string Name { get; }
-        public Expression<Func<ContentItem, bool>>? Filter { get; }
-
-        public TestMetricProvider(string name, Expression<Func<ContentItem, bool>> filter)
-        {
-            Name = name;
-            Filter = filter;
-        }
     }
 }

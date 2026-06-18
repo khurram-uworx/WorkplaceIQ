@@ -26,6 +26,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IForumComponentService, ForumComponentService>();
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IMetricService, MetricService>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider, ContentCountMetricProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider>(
+            new MetadataAggregationMetricProvider(MetricNames.MetadataSum, values => values.Sum())));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider>(
+            new MetadataAggregationMetricProvider(MetricNames.MetadataAverage, values => values.Average())));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider>(
+            new MetadataAggregationMetricProvider(MetricNames.MetadataMin, values => values.Min())));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider>(
+            new MetadataAggregationMetricProvider(MetricNames.MetadataMax, values => values.Max())));
         services.AddSingleton(HtmlEncoder.Default);
         services.AddScoped<LabelHtmlRenderer>();
         services.AddScoped<ComponentHtmlRenderer>();
