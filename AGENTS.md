@@ -12,6 +12,9 @@ dotnet run --project src\WorkplaceIQ.Web\WorkplaceIQ.Web.csproj
 ```
 
 - Do not invent or rotate ports unless `4792` is genuinely unavailable.
+- For smoke checks, give the app enough time to finish seeding and binding before requesting the page.
+- In this environment, `dotnet run --no-restore --project src\WorkplaceIQ.Web\WorkplaceIQ.Web.csproj` was the reliable way to keep the app up after restore/build had already succeeded.
+- If you need a background local run for smoke testing, redirect stdout and stderr to files so the process stays alive long enough to serve requests.
 
 ## Build And Test
 
