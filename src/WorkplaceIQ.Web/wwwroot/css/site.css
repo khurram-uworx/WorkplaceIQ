@@ -110,36 +110,13 @@ body {
   margin-top: .75rem;
 }
 
-.iq-feed__item-action-form,
-.iq-forum__item-action-form {
-  align-items: center;
-  display: flex;
-  gap: .35rem;
-}
-
-.iq-feed__item-action-form--edit,
-.iq-forum__item-action-form--edit {
-  flex-basis: 100%;
-  flex-wrap: wrap;
-}
-
-.iq-feed__item-action-input,
-.iq-forum__item-action-input {
-  border: 1px solid #d0d7de;
-  border-radius: 4px;
-  color: #24292f;
-  font-size: .875rem;
-  min-width: 8rem;
-  padding: .35rem .5rem;
-}
-
 .iq-feed__item-action,
 .iq-forum__item-action {
   align-items: center;
-  background: #fff;
-  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  border: 1px solid transparent;
   border-radius: 999px;
-  color: #24292f;
+  color: #57606a;
   display: inline-flex;
   font-size: .875rem;
   height: 2rem;
@@ -151,8 +128,9 @@ body {
 
 .iq-feed__item-action:hover,
 .iq-forum__item-action:hover {
-  background: #f6f8fa;
-  border-color: #8c959f;
+  background: #fff;
+  border-color: #d0d7de;
+  color: #24292f;
 }
 
 .iq-feed__item-action:focus-visible,
@@ -164,6 +142,10 @@ body {
 .iq-action-icon {
   height: 1rem;
   width: 1rem;
+}
+
+.iq-modal-message {
+  color: #57606a;
 }
 
 .iq-feed__comments,

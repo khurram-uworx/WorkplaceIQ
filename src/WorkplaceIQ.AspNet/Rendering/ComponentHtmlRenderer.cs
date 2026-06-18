@@ -159,130 +159,56 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
 
         if (interactions.AllowComment && itemType == "content")
         {
-            AppendCommentForm(html, blockClass, itemType, itemId);
+            AppendActionButton(html, blockClass, "comment", "Comment", itemType, itemId, title, body);
         }
 
         if (interactions.AllowLabel)
         {
-            AppendLabelForm(html, blockClass, itemType, itemId);
+            AppendActionButton(html, blockClass, "label", "Label", itemType, itemId, title, body);
         }
 
         if (interactions.AllowEdit)
         {
-            AppendEditForm(html, blockClass, itemType, itemId, title, body);
+            AppendActionButton(html, blockClass, "edit", "Edit", itemType, itemId, title, body);
         }
 
         if (interactions.AllowDelete)
         {
-            AppendDeleteForm(html, blockClass, itemType, itemId);
+            AppendActionButton(html, blockClass, "delete", "Delete", itemType, itemId, title, body);
         }
 
         html.Append("</div>");
         return html.ToString();
     }
 
-    private void AppendCommentForm(
+    private void AppendActionButton(
         StringBuilder html,
         string blockClass,
-        string itemType,
-        Guid itemId)
-    {
-        html.Append("<form method=\"post\" action=\"/Content/AddComment\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action-form\" data-iq-action=\"comment\">");
-        AppendTargetFields(html, itemType, itemId);
-        html.Append("<input name=\"body\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action-input\" placeholder=\"Add comment\" required>");
-        AppendSubmit(html, blockClass, "comment", "Comment");
-        html.Append("</form>");
-    }
-
-    private void AppendLabelForm(
-        StringBuilder html,
-        string blockClass,
-        string itemType,
-        Guid itemId)
-    {
-        html.Append("<form method=\"post\" action=\"/Content/AddLabel\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action-form\" data-iq-action=\"label\">");
-        AppendTargetFields(html, itemType, itemId);
-        html.Append("<input name=\"label\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action-input\" placeholder=\"Add label\" required>");
-        AppendSubmit(html, blockClass, "tag", "Label");
-        html.Append("</form>");
-    }
-
-    private void AppendEditForm(
-        StringBuilder html,
-        string blockClass,
+        string action,
+        string label,
         string itemType,
         Guid itemId,
         string title,
         string? body)
     {
-        html.Append("<form method=\"post\" action=\"/Content/Edit\" class=\"");
+        html.Append("<button type=\"button\" class=\"");
         html.Append(blockClass);
-        html.Append("__item-action-form ");
-        html.Append(blockClass);
-        html.Append("__item-action-form--edit\" data-iq-action=\"edit\">");
-        AppendTargetFields(html, itemType, itemId);
-        html.Append("<input name=\"title\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action-input\" value=\"");
-        html.Append(htmlEncoder.Encode(title));
-        html.Append("\" required>");
-        html.Append("<textarea name=\"body\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action-input\" rows=\"2\">");
-        html.Append(htmlEncoder.Encode(body ?? string.Empty));
-        html.Append("</textarea>");
-        AppendSubmit(html, blockClass, "save", "Save");
-        html.Append("</form>");
-    }
-
-    private static void AppendDeleteForm(
-        StringBuilder html,
-        string blockClass,
-        string itemType,
-        Guid itemId)
-    {
-        html.Append("<form method=\"post\" action=\"/Content/Delete\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action-form\" data-iq-action=\"delete\">");
-        AppendTargetFields(html, itemType, itemId);
-        AppendSubmit(html, blockClass, "trash", "Delete");
-        html.Append("</form>");
-    }
-
-    private static void AppendTargetFields(
-        StringBuilder html,
-        string itemType,
-        Guid itemId)
-    {
-        html.Append("<input type=\"hidden\" name=\"itemType\" value=\"");
+        html.Append("__item-action\" data-iq-action=\"");
+        html.Append(action);
+        html.Append("\" data-iq-item-type=\"");
         html.Append(itemType);
-        html.Append("\"><input type=\"hidden\" name=\"itemId\" value=\"");
+        html.Append("\" data-iq-item-id=\"");
         html.Append(itemId);
-        html.Append("\">");
-    }
-
-    private static void AppendSubmit(
-        StringBuilder html,
-        string blockClass,
-        string icon,
-        string label)
-    {
-        html.Append("<button type=\"submit\" class=\"");
-        html.Append(blockClass);
-        html.Append("__item-action\" aria-label=\"");
+        html.Append("\" data-iq-item-title=\"");
+        html.Append(htmlEncoder.Encode(title));
+        html.Append("\" data-iq-item-body=\"");
+        html.Append(htmlEncoder.Encode(body ?? string.Empty));
+        html.Append("\" aria-label=\"");
         html.Append(label);
         html.Append("\" title=\"");
         html.Append(label);
         html.Append("\">");
-        html.Append(RenderIcon(icon));
+        html.Append(RenderIcon(action));
         html.Append("<span class=\"visually-hidden\">");
         html.Append(label);
         html.Append("</span>");
@@ -294,9 +220,9 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         var path = icon switch
         {
             "comment" => "<path d=\"M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7A2.5 2.5 0 0 1 17.5 15H9l-5 4v-4.5A2.5 2.5 0 0 1 2 12V5.5Z\"/>",
-            "tag" => "<path d=\"M3 11.5V4h7.5L21 14.5 14.5 21 4 10.5Z\"/><path d=\"M7.5 7.5h.01\"/>",
-            "save" => "<path d=\"m5 12 4 4L19 6\"/>",
-            "trash" => "<path d=\"M4 7h16\"/><path d=\"M10 11v6\"/><path d=\"M14 11v6\"/><path d=\"M6 7l1 14h10l1-14\"/><path d=\"M9 7V4h6v3\"/>",
+            "label" => "<path d=\"M3 11.5V4h7.5L21 14.5 14.5 21 4 10.5Z\"/><path d=\"M7.5 7.5h.01\"/>",
+            "edit" => "<path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"/>",
+            "delete" => "<path d=\"M4 7h16\"/><path d=\"M10 11v6\"/><path d=\"M14 11v6\"/><path d=\"M6 7l1 14h10l1-14\"/><path d=\"M9 7V4h6v3\"/>",
             _ => string.Empty
         };
 
