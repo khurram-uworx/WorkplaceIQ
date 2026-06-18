@@ -2,7 +2,9 @@ namespace WorkplaceIQ.Tests.TestDoubles;
 
 using WorkplaceIQ;
 using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
+using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Posts;
 
 internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
@@ -12,6 +14,10 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
     public List<Post> Posts { get; } = [];
 
     public List<Label> Labels { get; } = [];
+
+    public List<ContentItem> ContentItems { get; } = [];
+
+    public List<MetricDefinition> MetricDefinitions { get; } = [];
 
     public Task<Container?> GetContainerByKeyAsync(
         string key,
@@ -32,7 +38,8 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         {
             Key = key,
             Type = type,
-            Title = title
+            Title = title,
+            RendererKey = type
         };
 
         Containers.Add(container);
@@ -53,13 +60,24 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         string title,
         string body,
         IReadOnlyList<LabelName> labels,
+        Guid? contentId = null,
+        string? postType = null,
+        string? authorUserId = null,
+        bool isSystemGenerated = false,
+        string? metadataJson = null,
         CancellationToken cancellationToken = default)
     {
+        var containerType = Containers.FirstOrDefault(container => container.Id == containerId)?.Type;
         var post = new Post
         {
             ContainerId = containerId,
             Title = title,
-            Body = body
+            Body = body,
+            ContentId = contentId,
+            PostType = postType ?? InferPostType(contentId, containerType),
+            AuthorUserId = authorUserId,
+            IsSystemGenerated = isSystemGenerated,
+            MetadataJson = metadataJson
         };
 
         foreach (var labelName in labels)
@@ -90,5 +108,59 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         Posts.Add(post);
 
         return Task.FromResult(post);
+    }
+
+    private static string InferPostType(Guid? contentId, string? containerType)
+    {
+        if (contentId.HasValue)
+        {
+            return PostTypes.Comment;
+        }
+
+        return containerType == ContainerTypes.Forum
+            ? PostTypes.Thread
+            : PostTypes.Post;
+    }
+
+    public Task<IReadOnlyList<ContentItem>> GetContentByContainerAsync(
+        Guid containerId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<ContentItem>>(
+            ContentItems.Where(c => c.ContainerId == containerId).ToList());
+    }
+
+    public Task<ContentItem?> GetContentByIdAsync(
+        Guid contentItemId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(ContentItems.FirstOrDefault(c => c.Id == contentItemId));
+    }
+
+    public Task<ContentItem> CreateContentAsync(
+        ContentItem item,
+        CancellationToken cancellationToken = default)
+    {
+        ContentItems.Add(item);
+        return Task.FromResult(item);
+    }
+
+    public Task<ContentItem> UpdateContentAsync(
+        ContentItem item,
+        CancellationToken cancellationToken = default)
+    {
+        var index = ContentItems.FindIndex(c => c.Id == item.Id);
+        if (index >= 0)
+        {
+            ContentItems[index] = item;
+        }
+        return Task.FromResult(item);
+    }
+
+    public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(MetricDefinitions.FirstOrDefault(m => m.Name == name));
     }
 }

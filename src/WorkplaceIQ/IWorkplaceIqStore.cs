@@ -1,5 +1,7 @@
 using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
+using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ;
@@ -26,5 +28,30 @@ public interface IWorkplaceIqStore
         string title,
         string body,
         IReadOnlyList<LabelName> labels,
+        Guid? contentId = null,
+        string? postType = null,
+        string? authorUserId = null,
+        bool isSystemGenerated = false,
+        string? metadataJson = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ContentItem>> GetContentByContainerAsync(
+        Guid containerId,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentItem?> GetContentByIdAsync(
+        Guid contentItemId,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentItem> CreateContentAsync(
+        ContentItem item,
+        CancellationToken cancellationToken = default);
+
+    Task<ContentItem> UpdateContentAsync(
+        ContentItem item,
+        CancellationToken cancellationToken = default);
+
+    Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
+        string name,
         CancellationToken cancellationToken = default);
 }

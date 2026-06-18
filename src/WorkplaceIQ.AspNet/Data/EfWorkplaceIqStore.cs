@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using WorkplaceIQ;
 using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
+using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.AspNet.Data;
@@ -32,6 +34,7 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             Key = key,
             Type = type,
             Title = title,
+            RendererKey = type,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -63,13 +66,29 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         string title,
         string body,
         IReadOnlyList<LabelName> labels,
+        Guid? contentId = null,
+        string? postType = null,
+        string? authorUserId = null,
+        bool isSystemGenerated = false,
+        string? metadataJson = null,
         CancellationToken cancellationToken = default)
     {
+        var containerType = await dbContext.Containers
+            .AsNoTracking()
+            .Where(container => container.Id == containerId)
+            .Select(container => container.Type)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var post = new Post
         {
             ContainerId = containerId,
             Title = title,
             Body = body,
+            ContentId = contentId,
+            PostType = postType ?? InferPostType(contentId, containerType),
+            AuthorUserId = authorUserId,
+            IsSystemGenerated = isSystemGenerated,
+            MetadataJson = metadataJson,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -103,5 +122,71 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return post;
+    }
+
+    private static string InferPostType(Guid? contentId, string? containerType)
+    {
+        if (contentId.HasValue)
+        {
+            return PostTypes.Comment;
+        }
+
+        return containerType == ContainerTypes.Forum
+            ? PostTypes.Thread
+            : PostTypes.Post;
+    }
+
+    public async Task<IReadOnlyList<ContentItem>> GetContentByContainerAsync(
+        Guid containerId,
+        CancellationToken cancellationToken = default)
+    {
+        var items = await dbContext.ContentItems
+            .AsNoTracking()
+            .Include(c => c.ContentLabels)
+                .ThenInclude(cl => cl.Label)
+            .Where(c => c.ContainerId == containerId)
+            .ToListAsync(cancellationToken);
+
+        return items
+            .OrderByDescending(c => c.CreatedAt)
+            .ToList();
+    }
+
+    public Task<ContentItem?> GetContentByIdAsync(
+        Guid contentItemId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.ContentItems
+            .AsNoTracking()
+            .Include(c => c.ContentLabels)
+                .ThenInclude(cl => cl.Label)
+            .FirstOrDefaultAsync(c => c.Id == contentItemId, cancellationToken);
+    }
+
+    public async Task<ContentItem> CreateContentAsync(
+        ContentItem item,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.ContentItems.Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return item;
+    }
+
+    public async Task<ContentItem> UpdateContentAsync(
+        ContentItem item,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.ContentItems.Update(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return item;
+    }
+
+    public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.MetricDefinitions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Name == name, cancellationToken);
     }
 }

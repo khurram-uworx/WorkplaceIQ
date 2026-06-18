@@ -1,3 +1,4 @@
+using WorkplaceIQ.Containers;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Posts;
 
@@ -58,6 +59,8 @@ public sealed class ComponentService(IWorkplaceIqStore store) : IComponentServic
         string title,
         string body,
         string? labels = null,
+        string? postType = null,
+        bool isSystemGenerated = false,
         CancellationToken cancellationToken = default)
     {
         var normalizedComponentId = RequireValue(componentId, $"A {componentName} id is required.", nameof(componentId));
@@ -79,7 +82,9 @@ public sealed class ComponentService(IWorkplaceIqStore store) : IComponentServic
             normalizedTitle,
             normalizedBody,
             LabelName.ParseList(labels),
-            cancellationToken);
+            postType: postType,
+            isSystemGenerated: isSystemGenerated,
+            cancellationToken: cancellationToken);
     }
 
     private static string RequireValue(string? value, string message, string parameterName)

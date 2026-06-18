@@ -31,6 +31,6 @@ public sealed class FeedTagHelper(
             output.Attributes.SetAttribute("data-iq-missing", "true");
         }
 
-        output.Content.SetHtmlContent(renderer.RenderFeed(result.DisplayTitle, result.Posts));
+        output.Content.SetHtmlContent(renderer.RenderFeed(result.DisplayTitle, result.Posts, result.ContentItems));
     }
 }

@@ -41,6 +41,7 @@ public sealed class ForumComponentService(IComponentService componentService) : 
             title,
             body,
             labels,
-            cancellationToken);
+            postType: PostTypes.Thread,
+            cancellationToken: cancellationToken);
     }
 }

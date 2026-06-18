@@ -1,17 +1,19 @@
 using System.Text;
 using System.Text.Encodings.Web;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.AspNet.Rendering;
 
 public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRenderer labelHtmlRenderer)
 {
-    public string RenderFeed(string displayTitle, IReadOnlyList<Post> posts)
+    public string RenderFeed(string displayTitle, IReadOnlyList<Post> posts, IReadOnlyList<ContentItem> contentItems)
     {
         return Render(
             "iq-feed",
             displayTitle,
             posts,
+            contentItems,
             "No feed items yet.");
     }
 
@@ -21,6 +23,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
             "iq-forum",
             displayTitle,
             posts,
+            [],
             "No forum threads yet.");
     }
 
@@ -28,6 +31,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         string blockClass,
         string displayTitle,
         IReadOnlyList<Post> posts,
+        IReadOnlyList<ContentItem> contentItems,
         string emptyText)
     {
         var html = new StringBuilder();
@@ -39,7 +43,7 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         html.Append(htmlEncoder.Encode(displayTitle));
         html.Append("</h2></header>");
 
-        if (posts.Count == 0)
+        if (posts.Count == 0 && contentItems.Count == 0)
         {
             html.Append("<p class=\"");
             html.Append(blockClass);
@@ -52,6 +56,28 @@ public sealed class ComponentHtmlRenderer(HtmlEncoder htmlEncoder, LabelHtmlRend
         html.Append("<ul class=\"");
         html.Append(blockClass);
         html.Append("__items\">");
+
+        foreach (var item in contentItems)
+        {
+            html.Append("<li class=\"");
+            html.Append(blockClass);
+            html.Append("__item\"><article><h3 class=\"");
+            html.Append(blockClass);
+            html.Append("__item-title\">");
+            html.Append(htmlEncoder.Encode(item.Title));
+            html.Append("</h3>");
+
+            if (!string.IsNullOrWhiteSpace(item.Body))
+            {
+                html.Append("<p class=\"");
+                html.Append(blockClass);
+                html.Append("__item-body\">");
+                html.Append(htmlEncoder.Encode(item.Body));
+                html.Append("</p>");
+            }
+
+            html.Append("</article></li>");
+        }
 
         foreach (var post in posts)
         {

@@ -1,10 +1,12 @@
-using WorkplaceIQ.Components;
 using WorkplaceIQ.Containers;
+using WorkplaceIQ.Components;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Feeds;
 
-public sealed class FeedComponentService(IComponentService componentService) : IFeedComponentService
+public sealed class FeedComponentService(
+    IComponentService componentService,
+    IWorkplaceIqStore store) : IFeedComponentService
 {
     public async Task<FeedComponentResult> ResolveFeedAsync(
         FeedComponentRequest request,
@@ -19,9 +21,14 @@ public sealed class FeedComponentService(IComponentService componentService) : I
                 "feed"),
             cancellationToken);
 
+        var contentItems = result.Container is null
+            ? []
+            : await store.GetContentByContainerAsync(result.Container.Id, cancellationToken);
+
         return new FeedComponentResult(
             result.Container,
             result.Posts,
+            contentItems,
             result.Created,
             result.Missing,
             result.DisplayTitle);
@@ -41,6 +48,6 @@ public sealed class FeedComponentService(IComponentService componentService) : I
             title,
             body,
             labels,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 }

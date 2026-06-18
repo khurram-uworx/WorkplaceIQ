@@ -15,5 +15,7 @@ public interface IComponentService
         string title,
         string body,
         string? labels = null,
+        string? postType = null,
+        bool isSystemGenerated = false,
         CancellationToken cancellationToken = default);
 }

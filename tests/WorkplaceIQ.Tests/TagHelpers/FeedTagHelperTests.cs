@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using WorkplaceIQ.AspNet.Rendering;
 using WorkplaceIQ.AspNet.TagHelpers;
 using WorkplaceIQ.Containers;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Feeds;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Posts;
@@ -37,12 +38,14 @@ public class FeedTagHelperTests
                             {
                                 Name = "Operations",
                                 NormalizedName = "OPERATIONS",
-                                Slug = "operations"
+                                Slug = "operations",
+                                Color = "#2563eb"
                             }
                         }
                     ]
                 }
             ],
+            [],
             false,
             false,
             "News Feed"));
@@ -63,7 +66,8 @@ public class FeedTagHelperTests
         Assert.That(output.Content.GetContent(), Does.Contain("<h2 class=\"iq-feed__title\">News Feed</h2>"));
         Assert.That(output.Content.GetContent(), Does.Contain("<h3 class=\"iq-feed__item-title\">Quarterly update</h3>"));
         Assert.That(output.Content.GetContent(), Does.Contain("<p class=\"iq-feed__item-body\">Results are ready.</p>"));
-        Assert.That(output.Content.GetContent(), Does.Contain("<li class=\"iq-label\">#Operations</li>"));
+        Assert.That(output.Content.GetContent(), Does.Contain("<li class=\"iq-label\" style=\"--iq-label-color: #2563eb\">"));
+        Assert.That(output.Content.GetContent(), Does.Contain("<span class=\"iq-label__dot\" style=\"background-color: #2563eb\"></span>#Operations"));
     }
 
     [Test]
@@ -77,6 +81,7 @@ public class FeedTagHelperTests
                 Type = ContainerTypes.Feed,
                 Title = "News Feed"
             },
+            [],
             [],
             false,
             false,
@@ -126,6 +131,7 @@ public class FeedTagHelperTests
                     ]
                 }
             ],
+            [],
             false,
             false,
             "<News>"));
@@ -148,6 +154,43 @@ public class FeedTagHelperTests
         Assert.That(html, Does.Not.Contain("<News>"));
         Assert.That(html, Does.Not.Contain("<Quarterly>"));
         Assert.That(html, Does.Not.Contain("<script>"));
+    }
+
+    [Test]
+    public async Task ProcessAsync_RendersContentItemsInFeed()
+    {
+        var service = new RecordingFeedComponentService(new FeedComponentResult(
+            new Container
+            {
+                Id = Guid.NewGuid(),
+                Key = "PowerOutages",
+                Type = ContainerTypes.Feed,
+                Title = "Power Outages"
+            },
+            [],
+            [
+                new ContentItem
+                {
+                    Title = "Generator 3 outage",
+                    Body = "Generator 3 lost power."
+                }
+            ],
+            false,
+            false,
+            "Power Outages"));
+
+        var tagHelper = new FeedTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
+        {
+            Id = "PowerOutages",
+            Title = "Power Outages"
+        };
+
+        var output = TagHelperOutputFactory.Create();
+
+        await tagHelper.ProcessAsync(CreateContext(), output);
+
+        Assert.That(output.Content.GetContent(), Does.Contain("<h3 class=\"iq-feed__item-title\">Generator 3 outage</h3>"));
+        Assert.That(output.Content.GetContent(), Does.Contain("<p class=\"iq-feed__item-body\">Generator 3 lost power.</p>"));
     }
 
     private static TagHelperContext CreateContext()

@@ -19,6 +19,12 @@ public sealed class Label
     [MaxLength(96)]
     public string Slug { get; set; } = string.Empty;
 
+    [MaxLength(7)]
+    public string? Color { get; set; }
+
+    [MaxLength(256)]
+    public string? Description { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<PostLabel> PostLabels { get; set; } = [];

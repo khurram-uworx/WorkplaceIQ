@@ -2,8 +2,17 @@
     ViewData["Title"] = "WorkplaceIQ Demo";
 }
 
+<h1 class="mb-4">WorkplaceIQ Demo</h1>
+
+<div class="iq-metrics-row mb-4">
+    <iq-metric name="OutageCountLast7Days" source="PowerOutages" />
+    <iq-metric name="TotalOutageTimeLast7Days" source="PowerOutages" />
+</div>
+
 <div class="iq-demo-grid">
     <div>
+        <iq-feed id="PowerOutages" title="Power Outages in Factory"></iq-feed>
+
         <iq-feed id="CompanyNews" title="News Feed"></iq-feed>
 
         <form asp-action="CreateFeedPost" method="post" class="mt-4">
@@ -45,6 +54,8 @@
             {
                 <div class="alert alert-success" role="status">@forumMessage</div>
             }
+
+            <div asp-validation-summary="All" class="text-danger mb-3"></div>
 
             <div class="mb-3">
                 <label for="forum-thread-title" class="form-label">Title</label>

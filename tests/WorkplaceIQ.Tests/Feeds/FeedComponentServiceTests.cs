@@ -2,6 +2,7 @@ namespace WorkplaceIQ.Tests.Feeds;
 
 using WorkplaceIQ.Containers;
 using WorkplaceIQ.Components;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Feeds;
 using WorkplaceIQ.Forums;
 using WorkplaceIQ.Tests.TestDoubles;
@@ -28,6 +29,32 @@ public class FeedComponentServiceTests
         Assert.That(second.Created, Is.False);
         Assert.That(second.DisplayTitle, Is.EqualTo("News Feed"));
         Assert.That(store.Containers, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ResolveFeedAsync_ReturnsContentItemsForFeedContainer()
+    {
+        var store = new InMemoryWorkplaceIqStore();
+        var service = CreateFeedService(store);
+
+        var feed = await service.ResolveFeedAsync(new FeedComponentRequest(
+            "PowerOutages",
+            "Power Outages",
+            true));
+        store.ContentItems.Add(new ContentItem
+        {
+            ContainerId = feed.Container!.Id,
+            ContentType = "Outage",
+            Name = "generator-3-outage",
+            Title = "Generator 3 outage"
+        });
+
+        var result = await service.ResolveFeedAsync(new FeedComponentRequest(
+            "PowerOutages",
+            "Power Outages",
+            true));
+
+        Assert.That(result.ContentItems.Select(item => item.Title), Is.EquivalentTo(new[] { "Generator 3 outage" }));
     }
 
     [Test]
@@ -92,6 +119,7 @@ public class FeedComponentServiceTests
         Assert.That(store.Posts, Has.Count.EqualTo(1));
         Assert.That(store.Posts[0].Title, Is.EqualTo("First item"));
         Assert.That(store.Posts[0].Body, Is.EqualTo("Hello from the feed."));
+        Assert.That(post.PostType, Is.EqualTo("post"));
     }
 
     [TestCase("", "Title", "Body", "A feed id is required.")]
@@ -127,7 +155,7 @@ public class FeedComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var componentService = new ComponentService(store);
-        var feedService = new FeedComponentService(componentService);
+        var feedService = new FeedComponentService(componentService, store);
         var forumService = new ForumComponentService(componentService);
 
         await feedService.ResolveFeedAsync(new FeedComponentRequest(
@@ -171,7 +199,7 @@ public class FeedComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var componentService = new ComponentService(store);
-        var feedService = new FeedComponentService(componentService);
+        var feedService = new FeedComponentService(componentService, store);
         var forumService = new ForumComponentService(componentService);
 
         var feed = await feedService.ResolveFeedAsync(new FeedComponentRequest(
@@ -196,12 +224,31 @@ public class FeedComponentServiceTests
 
         Assert.That(feedPost.ContainerId, Is.EqualTo(feed.Container!.Id));
         Assert.That(forumPost.ContainerId, Is.EqualTo(forum.Container!.Id));
+        Assert.That(feedPost.PostType, Is.EqualTo("post"));
+        Assert.That(forumPost.PostType, Is.EqualTo("thread"));
         Assert.That(store.Labels, Has.Count.EqualTo(1));
         Assert.That(feedPost.PostLabels.Single().LabelId, Is.EqualTo(forumPost.PostLabels.Single().LabelId));
     }
 
+    [Test]
+    public async Task StoreCreatePostAsync_InfersPostTypeFromContainerAndContent()
+    {
+        var store = new InMemoryWorkplaceIqStore();
+        var feed = await store.CreateContainerAsync("CompanyNews", ContainerTypes.Feed, "News Feed");
+        var forum = await store.CreateContainerAsync("MaintenanceForum", ContainerTypes.Forum, "Maintenance Forum");
+        var contentId = Guid.NewGuid();
+
+        var feedPost = await store.CreatePostAsync(feed.Id, "Feed item", "Body", []);
+        var forumThread = await store.CreatePostAsync(forum.Id, "Thread", "Body", []);
+        var comment = await store.CreatePostAsync(feed.Id, "Comment", "Body", [], contentId: contentId);
+
+        Assert.That(feedPost.PostType, Is.EqualTo("post"));
+        Assert.That(forumThread.PostType, Is.EqualTo("thread"));
+        Assert.That(comment.PostType, Is.EqualTo("comment"));
+    }
+
     private static FeedComponentService CreateFeedService(InMemoryWorkplaceIqStore store)
     {
-        return new FeedComponentService(new ComponentService(store));
+        return new FeedComponentService(new ComponentService(store), store);
     }
 }

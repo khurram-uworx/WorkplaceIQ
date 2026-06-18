@@ -1,8 +1,13 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using OpenTelemetry.Metrics;
 using WorkplaceIQ.AspNet;
 using WorkplaceIQ.AspNet.Data;
+using WorkplaceIQ.Metrics;
 using WorkplaceIQ.Web;
+using WorkplaceIQ.Web.Metrics;
+using IMetricProvider = WorkplaceIQ.Metrics.IMetricProvider;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +22,14 @@ builder.Services.AddDataProtection()
 builder.Services.AddWorkplaceIqAspNet(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("WorkplaceIQ")
         ?? "Data Source=workplaceiq.db"));
+
+builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider, OutageCountLast7DaysProvider>());
+builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider, TotalOutageTimeLast7DaysProvider>());
+
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics
+        .AddMeter("WorkplaceIQ")
+        .AddConsoleExporter());
 
 var app = builder.Build();
 

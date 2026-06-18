@@ -24,8 +24,23 @@ public sealed class LabelHtmlRenderer(HtmlEncoder htmlEncoder)
 
         foreach (var label in labels)
         {
-            html.Append("<li class=\"iq-label\">#");
-            html.Append(htmlEncoder.Encode(label!.Name));
+            html.Append("<li class=\"iq-label\"");
+            if (!string.IsNullOrWhiteSpace(label!.Color))
+            {
+                html.Append(" style=\"--iq-label-color: ");
+                html.Append(htmlEncoder.Encode(label.Color));
+                html.Append('"');
+            }
+            html.Append('>');
+            html.Append("<span class=\"iq-label__dot\"");
+            if (!string.IsNullOrWhiteSpace(label.Color))
+            {
+                html.Append(" style=\"background-color: ");
+                html.Append(htmlEncoder.Encode(label.Color));
+                html.Append('"');
+            }
+            html.Append("></span>#");
+            html.Append(htmlEncoder.Encode(label.Name));
             html.Append("</li>");
         }
 
