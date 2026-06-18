@@ -64,6 +64,10 @@ public class ForumTagHelperTests
         Assert.That(output.Content.GetContent(), Does.Contain("<h3 class=\"iq-forum__item-title\">Parking lights</h3>"));
         Assert.That(output.Content.GetContent(), Does.Contain("<p class=\"iq-forum__item-body\">Level two needs inspection.</p>"));
         Assert.That(output.Content.GetContent(), Does.Contain("<span class=\"iq-label__dot\"></span>#Safety"));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"comment\""));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"label\""));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"edit\""));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"delete\""));
     }
 
     [Test]

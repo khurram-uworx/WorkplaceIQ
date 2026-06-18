@@ -102,6 +102,30 @@ body {
   margin: 0;
 }
 
+.iq-feed__item-actions,
+.iq-forum__item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: .75rem;
+}
+
+.iq-feed__item-action,
+.iq-forum__item-action {
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  color: #24292f;
+  font-size: .875rem;
+  line-height: 1.25;
+  padding: .25rem .5rem;
+}
+
+.iq-feed__item-action:hover,
+.iq-forum__item-action:hover {
+  background: #f6f8fa;
+}
+
 .iq-labels {
   display: flex;
   flex-wrap: wrap;

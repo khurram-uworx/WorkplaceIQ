@@ -68,6 +68,10 @@ public class FeedTagHelperTests
         Assert.That(output.Content.GetContent(), Does.Contain("<p class=\"iq-feed__item-body\">Results are ready.</p>"));
         Assert.That(output.Content.GetContent(), Does.Contain("<li class=\"iq-label\" style=\"--iq-label-color: #2563eb\">"));
         Assert.That(output.Content.GetContent(), Does.Contain("<span class=\"iq-label__dot\" style=\"background-color: #2563eb\"></span>#Operations"));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"comment\""));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"label\""));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"edit\""));
+        Assert.That(output.Content.GetContent(), Does.Contain("data-iq-action=\"delete\""));
     }
 
     [Test]
@@ -191,6 +195,52 @@ public class FeedTagHelperTests
 
         Assert.That(output.Content.GetContent(), Does.Contain("<h3 class=\"iq-feed__item-title\">Generator 3 outage</h3>"));
         Assert.That(output.Content.GetContent(), Does.Contain("<p class=\"iq-feed__item-body\">Generator 3 lost power.</p>"));
+    }
+
+    [Test]
+    public async Task ProcessAsync_SystemManagedFeedDisablesMutationActionsButAllowsCommentAndLabel()
+    {
+        var service = new RecordingFeedComponentService(new FeedComponentResult(
+            new Container
+            {
+                Id = Guid.NewGuid(),
+                Key = "PowerOutages",
+                Type = ContainerTypes.Feed,
+                Title = "Power Outages"
+            },
+            [],
+            [
+                new ContentItem
+                {
+                    Title = "Generator 3 outage",
+                    Body = "Generator 3 lost power."
+                }
+            ],
+            false,
+            false,
+            "Power Outages"));
+
+        var tagHelper = new FeedTagHelper(service, new TestHostEnvironment("Development"), CreateRenderer())
+        {
+            Id = "PowerOutages",
+            Title = "Power Outages",
+            SystemManaged = true
+        };
+
+        var output = TagHelperOutputFactory.Create();
+
+        await tagHelper.ProcessAsync(CreateContext(), output);
+
+        var html = output.Content.GetContent();
+        Assert.That(output.Attributes["data-allow-add"].Value, Is.EqualTo("false"));
+        Assert.That(output.Attributes["data-allow-edit"].Value, Is.EqualTo("false"));
+        Assert.That(output.Attributes["data-allow-delete"].Value, Is.EqualTo("false"));
+        Assert.That(output.Attributes["data-allow-comment"].Value, Is.EqualTo("true"));
+        Assert.That(output.Attributes["data-allow-label"].Value, Is.EqualTo("true"));
+        Assert.That(html, Does.Contain("data-iq-action=\"comment\""));
+        Assert.That(html, Does.Contain("data-iq-action=\"label\""));
+        Assert.That(html, Does.Not.Contain("data-iq-action=\"edit\""));
+        Assert.That(html, Does.Not.Contain("data-iq-action=\"delete\""));
     }
 
     private static TagHelperContext CreateContext()

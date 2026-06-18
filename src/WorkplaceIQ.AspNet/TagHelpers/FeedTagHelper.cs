@@ -16,6 +16,24 @@ public sealed class FeedTagHelper(
 
     public string Title { get; set; } = string.Empty;
 
+    [HtmlAttributeName("system-managed")]
+    public bool SystemManaged { get; set; }
+
+    [HtmlAttributeName("allow-add")]
+    public bool? AllowAdd { get; set; }
+
+    [HtmlAttributeName("allow-edit")]
+    public bool? AllowEdit { get; set; }
+
+    [HtmlAttributeName("allow-delete")]
+    public bool? AllowDelete { get; set; }
+
+    [HtmlAttributeName("allow-comment")]
+    public bool? AllowComment { get; set; }
+
+    [HtmlAttributeName("allow-label")]
+    public bool? AllowLabel { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var result = await feedComponentService.ResolveFeedAsync(
@@ -25,12 +43,30 @@ public sealed class FeedTagHelper(
         output.TagMode = TagMode.StartTagAndEndTag;
         output.Attributes.SetAttribute("class", "iq-feed");
         output.Attributes.SetAttribute("data-iq-feed-id", Id);
+        var interactions = GetInteractionOptions();
+        ComponentHtmlRenderer.ApplyInteractionAttributes(output, interactions);
 
         if (result.Missing)
         {
             output.Attributes.SetAttribute("data-iq-missing", "true");
         }
 
-        output.Content.SetHtmlContent(renderer.RenderFeed(result.DisplayTitle, result.Posts, result.ContentItems));
+        output.Content.SetHtmlContent(renderer.RenderFeed(result.DisplayTitle, result.Posts, result.ContentItems, interactions));
+    }
+
+    private ComponentInteractionOptions GetInteractionOptions()
+    {
+        var defaults = SystemManaged
+            ? ComponentInteractionOptions.SystemManaged()
+            : new ComponentInteractionOptions();
+
+        return defaults with
+        {
+            AllowAdd = AllowAdd ?? defaults.AllowAdd,
+            AllowEdit = AllowEdit ?? defaults.AllowEdit,
+            AllowDelete = AllowDelete ?? defaults.AllowDelete,
+            AllowComment = AllowComment ?? defaults.AllowComment,
+            AllowLabel = AllowLabel ?? defaults.AllowLabel
+        };
     }
 }
