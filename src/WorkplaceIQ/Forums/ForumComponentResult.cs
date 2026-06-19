@@ -1,4 +1,3 @@
-using WorkplaceIQ.Content;
 using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Forums;

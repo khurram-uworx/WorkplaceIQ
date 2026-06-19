@@ -1,5 +1,3 @@
-using WorkplaceIQ.Content;
-
 namespace WorkplaceIQ.Metrics;
 
 public abstract class MetricProviderBase

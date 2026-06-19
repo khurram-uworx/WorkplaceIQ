@@ -1,5 +1,3 @@
-using WorkplaceIQ.Content;
-
 namespace WorkplaceIQ.Files;
 
 public sealed record FileComponentResult(

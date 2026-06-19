@@ -1,5 +1,3 @@
-using WorkplaceIQ.Content;
-
 namespace WorkplaceIQ.Labels;
 
 public sealed class ContentLabel

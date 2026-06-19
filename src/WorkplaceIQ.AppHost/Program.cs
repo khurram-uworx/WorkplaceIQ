@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Hosting;
-
 var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres")
