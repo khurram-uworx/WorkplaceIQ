@@ -1,5 +1,3 @@
-using WorkplaceIQ.Content;
-
 namespace WorkplaceIQ.Entities;
 
 public sealed record EntityComponentResult(

@@ -1,7 +1,6 @@
 using WorkplaceIQ.Components;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Entities;
-using WorkplaceIQ.Labels;
 using WorkplaceIQ.Tests.TestDoubles;
 
 namespace WorkplaceIQ.Tests.Entities;

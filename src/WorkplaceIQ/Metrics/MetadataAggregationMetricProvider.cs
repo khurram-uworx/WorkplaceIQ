@@ -1,5 +1,4 @@
 using System.Text.Json;
-using WorkplaceIQ.Content;
 
 namespace WorkplaceIQ.Metrics;
 

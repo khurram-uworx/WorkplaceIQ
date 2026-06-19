@@ -1,5 +1,5 @@
-using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics.Metrics;
 
 namespace WorkplaceIQ.Metrics;
 
