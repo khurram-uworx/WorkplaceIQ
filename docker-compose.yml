@@ -6,7 +6,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:4792
-      ConnectionStrings__WorkplaceIQ: Data Source=/app/App_Data/workplaceiq.dev.db
+      ConnectionStrings__WorkplaceIQ: Data Source=/app/App_Data/workplaceiq.db
       WorkplaceIQ__Storage__Provider: MinIO
       WorkplaceIQ__Storage__Endpoint: http://minio:9000
       WorkplaceIQ__Storage__BucketName: workplaceiq-files

@@ -1,6 +1,14 @@
 # Agent Notes
 
+Start by reading [README.md](README.md) for project overview, component inventory, quick start, and tech stack.
+
 This repo is still early and in flux. Keep changes small, sequential, and easy to verify.
+
+## Tools
+
+- **code-memory** — Discover architecture, components, symbols, and their relationships. Use `semantic_search`, `trace_dependency`, `get_edit_context`, and `impact_analysis` to understand code before editing.
+- **memori** — Store and recall facts, decisions, and context across sessions. Use `remember` to persist findings and `search` to retrieve them in future sessions.
+- **microsoft-learn** — Check official .NET / ASP.NET / Azure documentation for modern idioms, patterns, and APIs. Use when generating code to ensure alignment with current Microsoft conventions.
 
 ## Local App
 
@@ -44,10 +52,7 @@ The repo may use the latest installed .NET SDK, including preview SDKs, while pr
 - Linux-style command-line tools are available directly from PowerShell and can be used when they make debugging faster, including `rg`, `grep`, `awk`, `sed`, and related coreutils.
 - Do not wrap commands in `bash`; WSL may not have a distro installed. Call the available tools directly.
 
-## Current Shape
+## Conventions
 
-- `src\WorkplaceIQ` owns core entities and service contracts.
-- `src\WorkplaceIQ.AspNet` owns Tag Helpers, DbContext, and ASP.NET integration.
-- `src\WorkplaceIQ.Web` is the SQLite-backed demo/reference app.
 - Public Tag Helper prefix is `iq-`, for example `<iq-feed id="CompanyNews" title="News Feed" />`.
 - Keep tests split by behavior instead of adding everything to one large file.

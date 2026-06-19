@@ -1,414 +1,63 @@
 # WorkplaceIQ
 
-> Build intelligent intranets where every piece of content becomes searchable, measurable, conversational, and insight-ready.
+A metadata-driven content platform for building intranets, knowledge hubs, and operational portals using abstract primitives — containers, content, posts, labels, metadata, and relationships.
 
-WorkplaceIQ is an AI-native workplace platform for building modern intranets, knowledge hubs, collaboration portals, operational dashboards, and business applications.
-
-Unlike traditional CMS platforms that focus on pages and documents, WorkplaceIQ focuses on **content, metadata, relationships, and intelligence**.
-
-Every feed, forum, document library, business entity, and operational record is built on a common abstraction that enables:
-
-* Collaboration
-* Search
-* Analytics
-* AI Chat
-* Insights
-* Automation
-
----
-
-## Local Docker
-
-Run the demo app with MinIO-backed local infrastructure:
+## Quick Start
 
 ```powershell
+# Local (SQLite)
+dotnet run --project src\WorkplaceIQ.Web\WorkplaceIQ.Web.csproj
+
+# Docker (with MinIO file storage)
 docker compose up --build
 ```
 
-The web app is available at `http://localhost:4792`.
+App: `http://localhost:4792`. MinIO: `http://localhost:9000` / console at `:9001` (`workplaceiq` / `workplaceiq-secret`).
 
-MinIO is available at:
+## Projects
 
-* API: `http://localhost:9000`
-* Console: `http://localhost:9001`
+| Project | Purpose |
+|---------|---------|
+| `WorkplaceIQ` | Core domain model, service interfaces, metric providers |
+| `WorkplaceIQ.AspNet` | EF Core DbContext, Tag Helpers, HTML renderers, S3/MinIO storage |
+| `WorkplaceIQ.Web` | Demo/reference app (SQLite, seeded data) |
+| `WorkplaceIQ.ServiceDefaults` | OpenTelemetry, health checks, resilience |
+| `WorkplaceIQ.AppHost` | .NET Aspire orchestrator (PostgreSQL + MinIO) |
+| `WorkplaceIQ.Tests` | NUnit tests |
 
-Default local credentials:
+## Tag Helpers
 
-```text
-workplaceiq / workplaceiq-secret
+| Tag | Renders |
+|-----|---------|
+| `<iq-feed>` | Activity stream with posts, labels, comments |
+| `<iq-forum>` | Threaded discussions |
+| `<iq-files>` | File library with upload/download (S3/MinIO) |
+| `<iq-entity>` | Single business entity detail view |
+| `<iq-entity-list>` | Entity directory with relationships |
+| `<iq-metric>` | Configurable metric card (count / sum / avg / min / max) |
+
+Prefix: `iq-`. Registered via `@addTagHelper *, WorkplaceIQ.AspNet`.
+
+## Core Model
+
+```
+Container → Content → Post
+                ├── Metadata (JSON)
+                ├── Labels (many-to-many)
+                ├── Comments (Post with Comment type)
+                └── Relationships (directed, with metadata)
 ```
 
-The Compose file does not create storage buckets yet. Bucket creation should be handled by the application storage provider when the files slice is implemented.
+Container types: `FeedContainer`, `ForumContainer`, `FileContainer`, `EntityContainer`, `Directory`, `Dashboard`, `SystemFeed`, `KnowledgeBase`.
 
----
+## Tech Stack
 
-## Vision
+.NET 10 / ASP.NET Core MVC / EF Core 10 / SQLite (default) + PostgreSQL (optional) / S3 + MinIO / Bootstrap 5 / OpenTelemetry / NUnit 4.
 
-Traditional CMS platforms help organizations publish information.
+## Build & Test
 
-WorkplaceIQ helps organizations understand information.
-
-The platform treats all workplace information as structured content that can be:
-
-* Tagged
-* Related
-* Measured
-* Queried
-* Summarized
-* Analyzed
-* Discussed
-* Enhanced by AI
-
----
-
-## Core Principles
-
-### Everything is Content
-
-WorkplaceIQ is built around a small set of primitives:
-
-```text
-Container
- └── Content
-      └── Post
-           ├── Metadata
-           ├── Labels
-           ├── Comments
-           └── Relationships
+```powershell
+dotnet restore
+dotnet build --configuration Release
+dotnet test --configuration Release
 ```
-
-Examples:
-
-| Business Concept | WorkplaceIQ Representation |
-| ---------------- | -------------------------- |
-| Company News     | Feed                       |
-| Discussion Board | Forum                      |
-| HR Policies      | File Library               |
-| Machine          | Entity                     |
-| Customer         | Entity                     |
-| Incident         | Content                    |
-| Outage           | Content                    |
-| Project          | Container                  |
-
----
-
-### Everything Has Metadata
-
-Metadata is the foundation of workplace intelligence.
-
-Example:
-
-```json
-{
-  "durationSeconds": 3600,
-  "location": "Factory A",
-  "machineId": "GEN-03",
-  "severity": "High"
-}
-```
-
-The platform automatically exposes:
-
-* Counts
-* Sums
-* Averages
-* Trends
-* Distributions
-* Time-series analytics
-
-without requiring custom reporting code.
-
----
-
-### Everything is AI Ready
-
-Every content item can be:
-
-* Indexed
-* Embedded
-* Vectorized
-* Summarized
-* Queried through natural language
-
-Examples:
-
-> Show me unresolved outages from the last 30 days.
-
-> Which machine caused the highest downtime this quarter?
-
-> Summarize employee feedback regarding safety procedures.
-
----
-
-## Declarative Development Model
-
-WorkplaceIQ uses ASP.NET Razor Components and Tag Helpers to compose applications declaratively.
-
-Example:
-
-```html
-<iq-feed id="PowerOutages"
-         title="Power Outages"
-         allow-comments="true" />
-
-<iq-forum id="Maintenance"
-          title="Maintenance Discussions" />
-
-<iq-files id="SafetyDocuments"
-          title="Safety Documents" />
-
-<iq-entity id="Machines"
-          type="Machine" />
-```
-
-Behind the scenes the platform provisions:
-
-* Storage
-* APIs
-* Search
-* Permissions
-* Metadata
-* AI Indexes
-* Dashboards
-* Analytics
-
----
-
-## Built-In Components
-
-### Feeds
-
-Activity streams and announcements.
-
-```html
-<iq-feed />
-```
-
-### Forums
-
-Discussion and collaboration.
-
-```html
-<iq-forum />
-```
-
-### Files
-
-Document management.
-
-```html
-<iq-files />
-```
-
-### Entities
-
-Business objects.
-
-```html
-<iq-entity id="Customers" type="Customer" />
-<iq-entity id="Machines" type="Machine" />
-<iq-entity id="Projects" type="Project" />
-```
-
-### Dashboards
-
-Metric and insight visualization.
-
-```html
-<iq-dashboard />
-```
-
-### AI Chat
-
-Chat with content.
-
-```html
-<iq-ai-chat source="PowerOutages" />
-```
-
----
-
-## Metadata-Driven Analytics
-
-WorkplaceIQ automatically generates metrics from content metadata.
-
-Example:
-
-```json
-{
-  "durationSeconds": 1800
-}
-```
-
-Generated metrics:
-
-```text
-Count
-Sum
-Average
-Minimum
-Maximum
-Trend
-Moving Average
-Anomaly Detection
-```
-
-Business interpretation:
-
-```text
-Total Outage Time
-Average Outage Duration
-Monthly Downtime Trend
-```
-
----
-
-## AI Capabilities
-
-### Semantic Search
-
-Find content based on meaning rather than keywords.
-
-### Chat With Content
-
-Ask questions about:
-
-* Feeds
-* Forums
-* Files
-* Entities
-* Projects
-
-### Summaries
-
-Generate:
-
-* Daily summaries
-* Weekly digests
-* Executive reports
-
-### Insights
-
-Automatically identify:
-
-* Trends
-* Risks
-* Repeated issues
-* Emerging topics
-* Operational anomalies
-
----
-
-## Proposed Technology Stack
-
-### Backend
-
-* ASP.NET Core
-* ASP.NET MVC
-* Razor Pages
-* Razor Components
-* Entity Framework Core
-
-### Database
-
-* SQL Server
-* PostgreSQL
-
-### Search
-
-* Azure AI Search
-* Elasticsearch
-* OpenSearch
-
-### AI
-
-* Microsoft.Extensions.AI
-* Microsoft.Extensions.VectorData
-* Semantic Kernel
-* OpenAI
-* Azure OpenAI
-
-### Frontend
-
-* Razor Components
-* HTMX (optional)
-* Blazor (optional)
-
----
-
-## Repository Structure
-
-```text
-src/
-
-  WorkplaceIQ.Core/
-  WorkplaceIQ.Domain/
-  WorkplaceIQ.Application/
-  WorkplaceIQ.Infrastructure/
-
-  WorkplaceIQ.Web/
-
-  WorkplaceIQ.AI/
-  WorkplaceIQ.Search/
-  WorkplaceIQ.Analytics/
-
-  WorkplaceIQ.TagHelpers/
-
-tests/
-
-docs/
-
-samples/
-```
-
----
-
-## Roadmap
-
-### Phase 1
-
-* Core Content Model
-* Containers
-* Content
-* Posts
-* Labels
-* Metadata
-* Comments
-
-### Phase 2
-
-* Feeds
-* Forums
-* Files
-* Entities
-* Permissions
-
-### Phase 3
-
-* Vector Search
-* AI Chat
-* Summaries
-
-### Phase 4
-
-* Insights Engine
-* Analytics Engine
-* Recommendation Engine
-
-### Phase 5
-
-* Multi-Tenant SaaS
-* Marketplace
-* Component Ecosystem
-
----
-
-## Long-Term Goal
-
-Become the platform organizations use to build intelligent workplaces.
-
-Not just a CMS.
-
-Not just an intranet.
-
-A workplace intelligence platform.
