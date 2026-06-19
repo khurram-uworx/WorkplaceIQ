@@ -1,0 +1,26 @@
+@{
+    ViewData["Title"] = "Incidents";
+}
+
+<div class="iq-section-header">
+    <h1>Incidents</h1>
+    <p class="text-muted">Track and manage infrastructure outages and engineering incidents across all environments.</p>
+</div>
+
+<div class="iq-metrics-row mb-4">
+    <iq-metric name="workplaceiq.container.content.count"
+               source="PowerOutages"
+               content-type="Outage"
+               window="last_7_days" />
+    <iq-metric name="workplaceiq.metadata.sum"
+               source="PowerOutages"
+               content-type="Outage"
+               source-field="durationSeconds"
+               window="last_7_days"
+               unit="seconds"
+               display-unit="hours" />
+</div>
+
+<iq-feed id="PowerOutages"
+         title="Recent Incidents"
+         system-managed="true"></iq-feed>

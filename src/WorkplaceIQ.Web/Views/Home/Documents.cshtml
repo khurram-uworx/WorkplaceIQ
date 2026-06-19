@@ -1,0 +1,81 @@
+@{
+    ViewData["Title"] = "Documents";
+}
+
+<div class="iq-section-header">
+    <h1>Documents</h1>
+    <p class="text-muted">Central document repository for policies, runbooks, specs, and HR resources.</p>
+</div>
+
+@if (TempData["FilesMessage"] is string filesMessage)
+{
+    <div class="alert alert-success" role="status">@filesMessage</div>
+}
+
+<div class="iq-docs-grid">
+    <div>
+        <iq-files id="HRDocs" title="HR Documents"></iq-files>
+
+        <form asp-controller="Files" asp-action="Upload" method="post" enctype="multipart/form-data" class="iq-form-card mt-4">
+            <input type="hidden" name="filesId" value="HRDocs" />
+            <input type="hidden" name="returnUrl" value="@Url.Action("Documents")" />
+
+            <h3 class="h5 mb-3">Upload to HR Documents</h3>
+
+            <div class="mb-3">
+                <label for="hr-file" class="form-label">File</label>
+                <input id="hr-file" name="file" type="file" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label for="hr-file-title" class="form-label">Title</label>
+                <input id="hr-file-title" name="title" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="hr-file-description" class="form-label">Description</label>
+                <textarea id="hr-file-description" name="description" class="form-control" rows="2"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="hr-file-labels" class="form-label">Labels</label>
+                <input id="hr-file-labels" name="labels" class="form-control" placeholder="HR, Policy" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+    </div>
+
+    <div>
+        <iq-files id="EngineeringDocs" title="Engineering Docs"></iq-files>
+
+        <form asp-controller="Files" asp-action="Upload" method="post" enctype="multipart/form-data" class="iq-form-card mt-4">
+            <input type="hidden" name="filesId" value="EngineeringDocs" />
+            <input type="hidden" name="returnUrl" value="@Url.Action("Documents")" />
+
+            <h3 class="h5 mb-3">Upload to Engineering Docs</h3>
+
+            <div class="mb-3">
+                <label for="eng-file" class="form-label">File</label>
+                <input id="eng-file" name="file" type="file" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label for="eng-file-title" class="form-label">Title</label>
+                <input id="eng-file-title" name="title" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="eng-file-description" class="form-label">Description</label>
+                <textarea id="eng-file-description" name="description" class="form-control" rows="2"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="eng-file-labels" class="form-label">Labels</label>
+                <input id="eng-file-labels" name="labels" class="form-control" placeholder="Engineering, Runbook" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+    </div>
+</div>

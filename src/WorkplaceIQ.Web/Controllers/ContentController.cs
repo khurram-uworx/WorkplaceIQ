@@ -11,17 +11,18 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
     public async Task<IActionResult> AddComment(
         string itemType,
         Guid itemId,
-        string body)
+        string body,
+        string? returnUrl)
     {
         if (itemType != "content" || string.IsNullOrWhiteSpace(body))
         {
-            return RedirectToAction("Index", "Home");
+            return RedirectToLocal(returnUrl);
         }
 
         var item = await store.GetContentByIdAsync(itemId);
         if (item is null)
         {
-            return RedirectToAction("Index", "Home");
+            return RedirectToLocal(returnUrl);
         }
 
         await store.CreatePostAsync(
@@ -33,19 +34,20 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
             postType: PostTypes.Comment);
 
         TempData["ItemActionMessage"] = "Comment added.";
-        return RedirectToAction("Index", "Home");
+        return RedirectToLocal(returnUrl);
     }
 
     [HttpPost]
     public async Task<IActionResult> AddLabel(
         string itemType,
         Guid itemId,
-        string label)
+        string label,
+        string? returnUrl)
     {
         var parsed = LabelName.ParseList(label).FirstOrDefault();
         if (parsed is null)
         {
-            return RedirectToAction("Index", "Home");
+            return RedirectToLocal(returnUrl);
         }
 
         if (itemType == "content")
@@ -58,7 +60,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
         }
 
         TempData["ItemActionMessage"] = "Label added.";
-        return RedirectToAction("Index", "Home");
+        return RedirectToLocal(returnUrl);
     }
 
     [HttpPost]
@@ -66,11 +68,12 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
         string itemType,
         Guid itemId,
         string title,
-        string? body)
+        string? body,
+        string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
-            return RedirectToAction("Index", "Home");
+            return RedirectToLocal(returnUrl);
         }
 
         if (itemType == "content")
@@ -96,13 +99,14 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
         }
 
         TempData["ItemActionMessage"] = "Item updated.";
-        return RedirectToAction("Index", "Home");
+        return RedirectToLocal(returnUrl);
     }
 
     [HttpPost]
     public async Task<IActionResult> Delete(
         string itemType,
-        Guid itemId)
+        Guid itemId,
+        string? returnUrl)
     {
         if (itemType == "content")
         {
@@ -114,6 +118,15 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
         }
 
         TempData["ItemActionMessage"] = "Item deleted.";
+        return RedirectToLocal(returnUrl);
+    }
+
+    private IActionResult RedirectToLocal(string? returnUrl)
+    {
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
         return RedirectToAction("Index", "Home");
     }
 }

@@ -1,13 +1,21 @@
 @{
-    ViewData["Title"] = "WorkplaceIQ Demo";
+    ViewData["Title"] = "Dashboard";
 }
 
-<h1 class="mb-4">WorkplaceIQ Demo</h1>
-
-@if (TempData["ItemActionMessage"] is string itemActionMessage)
-{
-    <div class="alert alert-success" role="status">@itemActionMessage</div>
-}
+<div class="iq-hero">
+    <div class="iq-hero__content">
+        <h1 class="iq-hero__title">Workplace Inc.</h1>
+        <p class="iq-hero__subtitle">
+            Internal company portal — news, incidents, discussions, and documents.
+        </p>
+        <div class="iq-hero__actions">
+            <a asp-action="News" class="btn btn-primary">News</a>
+            <a asp-action="Incidents" class="btn btn-outline-secondary">Incidents</a>
+            <a asp-action="Discussions" class="btn btn-outline-secondary">Discussions</a>
+            <a asp-action="Documents" class="btn btn-outline-secondary">Documents</a>
+        </div>
+    </div>
+</div>
 
 <div class="iq-metrics-row mb-4">
     <iq-metric name="workplaceiq.container.content.count"
@@ -23,117 +31,31 @@
                display-unit="hours" />
 </div>
 
-<div class="iq-demo-grid">
-    <div>
-        <iq-feed id="PowerOutages"
-                 title="Power Outages in Factory"
-                 system-managed="true"></iq-feed>
+@if (TempData["ItemActionMessage"] is string itemActionMessage)
+{
+    <div class="alert alert-success" role="status">@itemActionMessage</div>
+}
 
-        <iq-feed id="CompanyNews"
-                 title="News Feed"
-                 disable-comment="true"></iq-feed>
+<div class="iq-dashboard-grid">
+    <a asp-action="News" class="iq-dash-card">
+        <div class="iq-dash-card__icon">📢</div>
+        <h2 class="iq-dash-card__title">Company News</h2>
+        <p class="iq-dash-card__desc">Announcements, product updates, and team highlights.</p>
+    </a>
+    <a asp-action="Incidents" class="iq-dash-card">
+        <div class="iq-dash-card__icon">⚡</div>
+        <h2 class="iq-dash-card__title">Incidents</h2>
+        <p class="iq-dash-card__desc">Infrastructure outages and engineering incidents.</p>
+    </a>
+    <a asp-action="Discussions" class="iq-dash-card">
+        <div class="iq-dash-card__icon">💬</div>
+        <h2 class="iq-dash-card__title">Discussions</h2>
+        <p class="iq-dash-card__desc">Engineering forums and team collaboration.</p>
+    </a>
+    <a asp-action="Documents" class="iq-dash-card">
+        <div class="iq-dash-card__icon">📄</div>
+        <h2 class="iq-dash-card__title">Documents</h2>
+        <p class="iq-dash-card__desc">Policies, runbooks, specs, and HR resources.</p>
+    </a>
 
-        <form asp-action="CreateFeedPost" method="post" class="mt-4">
-            <input type="hidden" name="feedId" value="CompanyNews" />
-
-            @if (TempData["FeedPostCreated"] is string feedMessage)
-            {
-                <div class="alert alert-success" role="status">@feedMessage</div>
-            }
-
-            <div asp-validation-summary="All" class="text-danger mb-3"></div>
-
-            <div class="mb-3">
-                <label for="feed-post-title" class="form-label">Title</label>
-                <input id="feed-post-title" name="title" class="form-control" required />
-            </div>
-
-            <div class="mb-3">
-                <label for="feed-post-body" class="form-label">Body</label>
-                <textarea id="feed-post-body" name="body" class="form-control" rows="3" required></textarea>
-            </div>
-
-            <div class="mb-3">
-                <label for="feed-post-labels" class="form-label">Labels</label>
-                <input id="feed-post-labels" name="labels" class="form-control" placeholder="Operations, Update" />
-            </div>
-
-            <button type="submit" class="btn btn-primary">Add item</button>
-        </form>
-    </div>
-
-    <div>
-        <iq-forum id="MaintenanceForum" title="Maintenance Forum"></iq-forum>
-
-        <form asp-action="CreateForumThread" method="post" class="mt-4">
-            <input type="hidden" name="forumId" value="MaintenanceForum" />
-
-            @if (TempData["ForumThreadCreated"] is string forumMessage)
-            {
-                <div class="alert alert-success" role="status">@forumMessage</div>
-            }
-
-            <div asp-validation-summary="All" class="text-danger mb-3"></div>
-
-            <div class="mb-3">
-                <label for="forum-thread-title" class="form-label">Title</label>
-                <input id="forum-thread-title" name="title" class="form-control" required />
-            </div>
-
-            <div class="mb-3">
-                <label for="forum-thread-body" class="form-label">Body</label>
-                <textarea id="forum-thread-body" name="body" class="form-control" rows="3" required></textarea>
-            </div>
-
-            <div class="mb-3">
-                <label for="forum-thread-labels" class="form-label">Labels</label>
-                <input id="forum-thread-labels" name="labels" class="form-control" placeholder="Maintenance, Safety" />
-            </div>
-
-            <button type="submit" class="btn btn-primary">Add thread</button>
-        </form>
-    </div>
-
-    <div>
-        <iq-files id="HRDocs" title="HR Documents"></iq-files>
-
-        <form asp-controller="Files" asp-action="Upload" method="post" enctype="multipart/form-data" class="mt-4">
-            <input type="hidden" name="filesId" value="HRDocs" />
-
-            @if (TempData["FilesMessage"] is string filesMessage)
-            {
-                <div class="alert alert-success" role="status">@filesMessage</div>
-            }
-
-            <div class="mb-3">
-                <label for="hr-file" class="form-label">File</label>
-                <input id="hr-file" name="file" type="file" class="form-control" required />
-            </div>
-
-            <div class="mb-3">
-                <label for="hr-file-title" class="form-label">Title</label>
-                <input id="hr-file-title" name="title" class="form-control" />
-            </div>
-
-            <div class="mb-3">
-                <label for="hr-file-description" class="form-label">Description</label>
-                <textarea id="hr-file-description" name="description" class="form-control" rows="3"></textarea>
-            </div>
-
-            <div class="mb-3">
-                <label for="hr-file-labels" class="form-label">Labels</label>
-                <input id="hr-file-labels" name="labels" class="form-control" placeholder="HR, Policy" />
-            </div>
-
-            <button type="submit" class="btn btn-primary">Upload file</button>
-        </form>
-    </div>
-
-    <div>
-        <iq-files id="ITDocs" title="IT Documents"></iq-files>
-    </div>
-
-    <div>
-        <iq-entity-list id="Machines" title="Machines" type="Machine"></iq-entity-list>
-    </div>
 </div>

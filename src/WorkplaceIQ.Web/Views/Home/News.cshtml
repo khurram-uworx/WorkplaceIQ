@@ -1,0 +1,41 @@
+@{
+    ViewData["Title"] = "Company News";
+}
+
+<div class="iq-section-header">
+    <h1>Company News</h1>
+    <p class="text-muted">Stay up to date with company announcements, product updates, and team highlights.</p>
+</div>
+
+@if (TempData["FeedPostCreated"] is string feedMessage)
+{
+    <div class="alert alert-success" role="status">@feedMessage</div>
+}
+
+<iq-feed id="CompanyNews"
+         title="News Feed"
+         disable-comment="true"></iq-feed>
+
+<form asp-action="CreateFeedPost" method="post" class="iq-form-card mt-4">
+    <input type="hidden" name="feedId" value="CompanyNews" />
+    <input type="hidden" name="returnUrl" value="@Url.Action("News")" />
+
+    <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+    <div class="mb-3">
+        <label for="feed-post-title" class="form-label">Title</label>
+        <input id="feed-post-title" name="title" class="form-control" required />
+    </div>
+
+    <div class="mb-3">
+        <label for="feed-post-body" class="form-label">Body</label>
+        <textarea id="feed-post-body" name="body" class="form-control" rows="3" required></textarea>
+    </div>
+
+    <div class="mb-3">
+        <label for="feed-post-labels" class="form-label">Labels</label>
+        <input id="feed-post-labels" name="labels" class="form-control" placeholder="Announcement, Operations" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Add post</button>
+</form>

@@ -25,6 +25,7 @@ document.addEventListener("click", event => {
   document.querySelector("label[for=\"iqItemActionBody\"]").textContent = config.bodyLabel || "Comment";
   document.getElementById("iqItemActionType").value = trigger.dataset.iqItemType || "";
   document.getElementById("iqItemActionId").value = trigger.dataset.iqItemId || "";
+  document.getElementById("iqItemActionReturnUrl").value = window.location.href;
   document.getElementById("iqItemActionMessage").textContent = config.message || "";
 
   form.action = config.action;

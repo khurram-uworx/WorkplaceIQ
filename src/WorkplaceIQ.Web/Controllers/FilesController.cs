@@ -12,12 +12,13 @@ public sealed class FilesController(IFileComponentService fileComponentService) 
         string? title,
         string? description,
         string? labels,
+        string? returnUrl,
         IFormFile? file)
     {
         if (file is null || file.Length == 0)
         {
             TempData["FilesMessage"] = "Choose a non-empty file.";
-            return RedirectToAction("Index", "Home");
+            return RedirectToLocal(returnUrl);
         }
 
         await using var stream = file.OpenReadStream();
@@ -32,7 +33,7 @@ public sealed class FilesController(IFileComponentService fileComponentService) 
             labels));
 
         TempData["FilesMessage"] = "File uploaded.";
-        return RedirectToAction("Index", "Home");
+        return RedirectToLocal(returnUrl);
     }
 
     [HttpGet]
@@ -47,5 +48,14 @@ public sealed class FilesController(IFileComponentService fileComponentService) 
 
         var stream = await fileComponentService.OpenReadAsync(id);
         return File(stream, file.FileRecord.ContentType, file.FileRecord.FileName);
+    }
+
+    private IActionResult RedirectToLocal(string? returnUrl)
+    {
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+        return RedirectToAction("Documents", "Home");
     }
 }

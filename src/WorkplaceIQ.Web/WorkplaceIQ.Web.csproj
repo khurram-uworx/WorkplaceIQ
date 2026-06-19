@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.*" />
 
     <ProjectReference Include="..\WorkplaceIQ\WorkplaceIQ.csproj" />
     <ProjectReference Include="..\WorkplaceIQ.AspNet\WorkplaceIQ.AspNet.csproj" />

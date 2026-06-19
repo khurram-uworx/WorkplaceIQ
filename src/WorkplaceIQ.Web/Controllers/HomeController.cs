@@ -15,13 +15,34 @@ public class HomeController(
         return View();
     }
 
+    public IActionResult News()
+    {
+        return View();
+    }
+
+    public IActionResult Incidents()
+    {
+        return View();
+    }
+
+    public IActionResult Discussions()
+    {
+        return View();
+    }
+
+    public IActionResult Documents()
+    {
+        return View();
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateFeedPost(
         string feedId,
         string title,
         string body,
-        string? labels)
+        string? labels,
+        string? returnUrl)
     {
         try
         {
@@ -30,16 +51,16 @@ public class HomeController(
         catch (ArgumentException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return View(nameof(Index));
+            return RedirectToLocal(returnUrl, nameof(News));
         }
         catch (InvalidOperationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return View(nameof(Index));
+            return RedirectToLocal(returnUrl, nameof(News));
         }
 
         TempData["FeedPostCreated"] = "Feed item added.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToLocal(returnUrl, nameof(News));
     }
 
     [HttpPost]
@@ -48,7 +69,8 @@ public class HomeController(
         string forumId,
         string title,
         string body,
-        string? labels)
+        string? labels,
+        string? returnUrl)
     {
         try
         {
@@ -57,16 +79,16 @@ public class HomeController(
         catch (ArgumentException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return View(nameof(Index));
+            return RedirectToLocal(returnUrl, nameof(Discussions));
         }
         catch (InvalidOperationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return View(nameof(Index));
+            return RedirectToLocal(returnUrl, nameof(Discussions));
         }
 
         TempData["ForumThreadCreated"] = "Forum thread added.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToLocal(returnUrl, nameof(Discussions));
     }
 
     public IActionResult Privacy()
@@ -78,5 +100,14 @@ public class HomeController(
     public IActionResult Error()
     {
         return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+    }
+
+    private IActionResult RedirectToLocal(string? returnUrl, string defaultAction)
+    {
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+        return RedirectToAction(defaultAction);
     }
 }

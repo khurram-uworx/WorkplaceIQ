@@ -19,9 +19,18 @@ builder.Services.Configure<FileStorageOptions>(
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(
         Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys")));
-builder.Services.AddWorkplaceIqAspNet(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("WorkplaceIQ")
-        ?? "Data Source=workplaceiq.db"));
+
+var connectionString = builder.Configuration.GetConnectionString("WorkplaceIQ");
+if (!string.IsNullOrEmpty(connectionString) && connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddWorkplaceIqAspNet(options =>
+        options.UseNpgsql(connectionString));
+}
+else
+{
+    builder.Services.AddWorkplaceIqAspNet(options =>
+        options.UseSqlite(connectionString ?? "Data Source=workplaceiq.db"));
+}
 
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics => metrics.AddMeter("WorkplaceIQ"));
