@@ -50,9 +50,26 @@ Container → Content → Post
 
 Container types: `FeedContainer`, `ForumContainer`, `FileContainer`, `EntityContainer`, `Directory`, `Dashboard`, `SystemFeed`, `KnowledgeBase`.
 
+## Storage Providers
+
+Provider selection via `Storage:Provider` in `appsettings.json` (default: `sqlite`).
+
+| Provider | EF Core | Vector Store | Connection String Key |
+|----------|---------|-------------|----------------------|
+| `sqlite` | `UseSqlite` | `SqliteVectorStore` | `ConnectionStrings:Sqlite` |
+| `pgvector` | `UseNpgsql` | `PostgresVectorStore` | `ConnectionStrings:Npgsql` / `PgVector` |
+| `sqlserver` | `UseSqlServer` | `SqlServerVectorStore` | `ConnectionStrings:SqlServer` |
+| `inmemory` | `UseInMemoryDatabase` | `InMemoryVectorStore` | none |
+
+See [ADR: SK PgVector Connector Compatibility](docs/adr/Library-Storage-PgVector-Connector-01.md) for known Npgsql version constraints.
+
+## Architecture Decisions
+
+Architecture Decision Records (ADRs) are stored in [`docs/adr/`](docs/adr/). Each ADR documents a significant design decision with context, rationale, and tradeoffs.
+
 ## Tech Stack
 
-.NET 10 / ASP.NET Core MVC / EF Core 10 / SQLite (default) + PostgreSQL (optional) / S3 + MinIO / Bootstrap 5 / OpenTelemetry / NUnit 4.
+.NET 10 / ASP.NET Core MVC / EF Core 10 / SQLite (default) + PostgreSQL (optional) / S3 + MinIO / Bootstrap 5 / OpenTelemetry / NUnit 4 / Semantic Kernel VectorStore connectors.
 
 ## Build & Test
 

@@ -56,3 +56,74 @@ The repo may use the latest installed .NET SDK, including preview SDKs, while pr
 
 - Public Tag Helper prefix is `iq-`, for example `<iq-feed id="CompanyNews" title="News Feed" />`.
 - Keep tests split by behavior instead of adding everything to one large file.
+
+## Domain Boundaries
+
+WorkplaceIQ is a metadata-driven content platform — containers, content, posts, labels, metadata, and relationships. It is NOT a generic CMS, a chat UI, or a data pipeline framework.
+
+Forbidden: custom LLM clients, custom embedding pipelines, custom DI containers, custom vector databases.
+
+## ADR Style
+
+ADRs (Architecture Decision Records) live in `docs/adr/` and follow the format: Context → Decision → Rationale → Consequences → Alternatives considered.
+
+ADRs should describe **what** the system does at an architectural level and **why**, without pinning down implementation method names, parameter types, or class signatures that can drift during implementation. Include intent, constraints, and tradeoffs; leave concrete API surface to the code. If an ADR contradicts the implementation, update the ADR toward the abstract intent — the implementation is the source of truth for specifics.
+
+### Existing ADRs
+
+| ADR | Topic |
+|-----|-------|
+| [Library-Storage-PgVector-Connector-01](docs/adr/Library-Storage-PgVector-Connector-01.md) | SK PgVector connector & Npgsql version compatibility |
+
+## DI Conventions
+
+- `WorkplaceIQ.AspNet/ServiceCollectionExtensions.cs` is the central DI registration point.
+- Per-provider extension methods (`AddWorkplaceIqSqliteStorage`, `AddWorkplaceIqSqlServerStorage`, etc.) call the generic `AddWorkplaceIqAspNet` internally.
+- `IWorkplaceIqStore` → `EfWorkplaceIqStore` uses `IDbContextFactory<WorkplaceIqDbContext>` for thread safety.
+- All service classes depend on `IWorkplaceIqStore`, never on `WorkplaceIqDbContext` directly.
+- Prefer `AddSingleton` for stateless services, `AddScoped` for stateful services that depend on EF Core.
+
+## Storage Providers
+
+Provider selection via `Storage:Provider` in `appsettings.json`:
+- `sqlite` (default dev) — `UseSqlite` + `SqliteVectorStore`
+- `pgvector` — `UseNpgsql` + `PostgresVectorStore`
+- `sqlserver` — `UseSqlServer` + `SqlServerVectorStore`
+- `inmemory` — `UseInMemoryDatabase` + `InMemoryVectorStore`
+
+See [ADR Library-Storage-PgVector-Connector-01](docs/adr/Library-Storage-PgVector-Connector-01.md) for known compatibility notes on the PgVector/SK connector.
+
+## Code Style
+
+- **Primary constructors:** Preferred for service/DI classes
+- **`sealed class`:** Default for non-abstract classes
+- **Collection expressions:** `[]` for empty/static, `new List<T>()` for mutable
+- **Entity configurations:** Use `IEntityTypeConfiguration<T>` classes in `WorkplaceIQ.AspNet/Data/Configurations/` and apply via `modelBuilder.ApplyConfiguration()` in `OnModelCreating`
+
+## Project Structure
+
+```
+src/
+├── WorkplaceIQ/            # Domain model, interfaces, service abstractions
+├── WorkplaceIQ.AspNet/     # EF Core DbContext, store impl, tag helpers, renderers
+│   └── Data/
+│       ├── Configurations/ # IEntityTypeConfiguration<T> classes
+│       ├── WorkplaceIqDbContext.cs
+│       └── EfWorkplaceIqStore.cs
+├── WorkplaceIQ.Web/        # Web host (Program.cs, controllers, views, SignalFlow)
+├── WorkplaceIQ.ServiceDefaults/  # OpenTelemetry, resilience
+└── WorkplaceIQ.AppHost/    # .NET Aspire orchestrator
+```
+
+## Common Pitfalls
+
+- `Files.FileRecord` conflicts with `WorkplaceIQ.AspNet.Files` namespace — use fully-qualified `WorkplaceIQ.Files.FileRecord` in `WorkplaceIqDbContext`.
+- `EfWorkplaceIqStore` uses `IDbContextFactory<WorkplaceIqDbContext>` — do not inject `WorkplaceIqDbContext` directly into services.
+- The SK PgVector connector (`Microsoft.SemanticKernel.Connectors.PgVector`) may have Npgsql version compatibility issues at runtime — see [ADR](docs/adr/Library-Storage-PgVector-Connector-01.md).
+
+## Testing
+
+- **Framework:** NUnit 4.x
+- **Test doubles:** `InMemoryWorkplaceIqStore` (list-based), `InMemoryFileObjectStorage`
+- **Naming:** `Method_Scenario_ExpectedBehavior`
+- **Pattern:** Arrange-Act-Assert (no comments needed)

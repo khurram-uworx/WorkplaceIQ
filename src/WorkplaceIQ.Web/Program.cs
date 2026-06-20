@@ -5,6 +5,9 @@ using OpenAI;
 using System.ClientModel;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Connectors.InMemory;
+using Microsoft.SemanticKernel.Connectors.SqliteVec;
+using Microsoft.SemanticKernel.Connectors.PgVector;
+using Microsoft.SemanticKernel.Connectors.SqlServer;
 using WorkplaceIQ.AspNet;
 using WorkplaceIQ.AspNet.Data;
 using WorkplaceIQ.AspNet.Files;
@@ -49,20 +52,16 @@ var connectionString = provider.ToLowerInvariant() switch
 switch (provider.ToLowerInvariant())
 {
     case "sqlite":
-        builder.Services.AddWorkplaceIqAspNet(options =>
-            options.UseSqlite(connectionString));
+        builder.Services.AddWorkplaceIqSqliteStorage(connectionString!);
         break;
     case "pgvector":
-        builder.Services.AddWorkplaceIqAspNet(options =>
-            options.UseNpgsql(connectionString));
+        builder.Services.AddWorkplaceIqPgVectorStorage(connectionString!);
         break;
     case "sqlserver":
-        builder.Services.AddWorkplaceIqAspNet(options =>
-            options.UseSqlServer(connectionString));
+        builder.Services.AddWorkplaceIqSqlServerStorage(connectionString!);
         break;
     case "inmemory":
-        builder.Services.AddWorkplaceIqAspNet(options =>
-            options.UseInMemoryDatabase("workplaceiq"));
+        builder.Services.AddWorkplaceIqInMemoryStorage();
         break;
 }
 
@@ -76,7 +75,7 @@ builder.Services.AddSingleton(sigConfig);
 builder.Services.AddSingleton<CategoryCentroidTracker>();
 
 // VectorStore provider dispatch — matches Storage:Provider used by EF Core above.
-var vectorStore = CreateVectorStore(provider);
+var vectorStore = CreateVectorStore(provider, connectionString);
 builder.Services.AddSingleton(vectorStore);
 
 // Build the typed collection once with the embedding dimension from config.
@@ -145,15 +144,12 @@ app.MapControllerRoute(
 
 app.Run();
 
-static VectorStore CreateVectorStore(string provider) => provider.ToLowerInvariant() switch
+static VectorStore CreateVectorStore(string provider, string? connectionString) => provider.ToLowerInvariant() switch
 {
     "inmemory" => new InMemoryVectorStore(),
-    "sqlite" => throw new NotSupportedException(
-        "SQLite vector store requires the Microsoft.SemanticKernel.Connectors.SqliteVec package."),
-    "pgvector" => throw new NotSupportedException(
-        "pgvector vector store requires the Microsoft.SemanticKernel.Connectors.PgVector package."),
-    "sqlserver" => throw new NotSupportedException(
-        "SQL Server vector store requires the Microsoft.SemanticKernel.Connectors.SqlServer package."),
+    "sqlite" => new SqliteVectorStore(connectionString!),
+    "pgvector" => new PostgresVectorStore(connectionString!),
+    "sqlserver" => new SqlServerVectorStore(connectionString!, new SqlServerVectorStoreOptions()),
     var p => throw new InvalidOperationException(
         $"Unsupported vector store provider '{p}'. Supported: inmemory, sqlite, pgvector, sqlserver")
 };
