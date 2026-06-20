@@ -379,10 +379,29 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
                 .ToList());
     }
 
-    public Task<ClassifiedItem> CreateClassifiedItemAsync(
+    /// <summary>
+    /// In-memory upsert matching EfWorkplaceIqStore behavior.
+    /// Preserves original Id when updating an existing classification.
+    /// This double must stay in sync with the EF implementation for ADR 02 refactoring safety.
+    /// </summary>
+    public Task<ClassifiedItem> UpsertClassifiedItemAsync(
         ClassifiedItem item,
         CancellationToken cancellationToken = default)
     {
+        var existing = ClassifiedItems.FirstOrDefault(ci => ci.ContentId == item.ContentId);
+        if (existing is not null)
+        {
+            existing.LabelId = item.LabelId;
+            existing.Reasoning = item.Reasoning;
+            existing.IsNoise = item.IsNoise;
+            existing.AttemptCount = item.AttemptCount;
+            existing.HallucinatedSignal = item.HallucinatedSignal;
+            existing.Embedding = item.Embedding;
+            existing.ClassificationSource = item.ClassificationSource;
+            existing.ClassifiedAt = item.ClassifiedAt;
+            return Task.FromResult(existing);
+        }
+
         ClassifiedItems.Add(item);
         return Task.FromResult(item);
     }

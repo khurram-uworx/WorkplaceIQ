@@ -405,15 +405,24 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
 
     // ----- Classification queries -----
 
+    /// <summary>
+    /// Base query for read-only classified item access. Encapsulates the
+    /// AsNoTrackingWithIdentityResolution + Include boilerplate shared by all
+    /// classified item queries. Not used for write operations (Upsert, Update)
+    /// which require change tracking.
+    /// </summary>
+    private IQueryable<ClassifiedItem> ClassifiedItemQuery(WorkplaceIqDbContext db)
+        => db.ClassifiedItems
+            .AsNoTrackingWithIdentityResolution()
+            .Include(item => item.RssItem)
+            .Include(item => item.SignalLabel);
+
     public async Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.ClassifiedItems
-            .AsNoTrackingWithIdentityResolution()
-            .Include(item => item.RssItem)
-            .Include(item => item.SignalLabel)
+        return await ClassifiedItemQuery(db)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
     }
 
@@ -422,10 +431,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.ClassifiedItems
-            .AsNoTrackingWithIdentityResolution()
-            .Include(item => item.RssItem)
-            .Include(item => item.SignalLabel)
+        return await ClassifiedItemQuery(db)
             .FirstOrDefaultAsync(item => item.ContentId == contentId, cancellationToken);
     }
 
@@ -436,18 +442,12 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var items = await db.ClassifiedItems
-            .AsNoTrackingWithIdentityResolution()
-            .Include(item => item.RssItem)
-            .Include(item => item.SignalLabel)
+        return await ClassifiedItemQuery(db)
             .Where(item => item.LabelId == labelId)
-            .ToListAsync(cancellationToken);
-
-        return items
             .OrderByDescending(item => item.ClassifiedAt)
             .Skip(offset)
             .Take(limit)
-            .ToList();
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(
@@ -455,24 +455,44 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var items = await db.ClassifiedItems
-            .AsNoTrackingWithIdentityResolution()
-            .Include(item => item.RssItem)
-            .Include(item => item.SignalLabel)
+        return await ClassifiedItemQuery(db)
             .Where(item => !item.IsNoise)
-            .ToListAsync(cancellationToken);
-
-        return items
             .OrderByDescending(item => item.ClassifiedAt)
             .Take(limit)
-            .ToList();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<ClassifiedItem> CreateClassifiedItemAsync(
+    /// <summary>
+    /// Upserts a classification by ContentId. Ensures the one-classification-per-content invariant.
+    /// When ADR 02 refactors Content into Container/ContentItem, this method must be updated to
+    /// match the new entity hierarchy while preserving the one-per-content invariant.
+    /// </summary>
+    public async Task<ClassifiedItem> UpsertClassifiedItemAsync(
         ClassifiedItem item,
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // Find existing classification for this content. If found, update in-place
+        // preserving the original Id (stable reference) but overwriting all other fields.
+        // This is the "last classification wins" behavior.
+        var existing = await db.ClassifiedItems
+            .FirstOrDefaultAsync(ci => ci.ContentId == item.ContentId, cancellationToken);
+
+        if (existing is not null)
+        {
+            existing.LabelId = item.LabelId;
+            existing.Reasoning = item.Reasoning;
+            existing.IsNoise = item.IsNoise;
+            existing.AttemptCount = item.AttemptCount;
+            existing.HallucinatedSignal = item.HallucinatedSignal;
+            existing.Embedding = item.Embedding;
+            existing.ClassificationSource = item.ClassificationSource;
+            existing.ClassifiedAt = item.ClassifiedAt;
+            await db.SaveChangesAsync(cancellationToken);
+            return existing;
+        }
+
         db.ClassifiedItems.Add(item);
         await db.SaveChangesAsync(cancellationToken);
         return item;
@@ -517,9 +537,6 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var classifiedContentIds = await db.ClassifiedItems
-            .Select(item => item.ContentId)
-            .ToListAsync(cancellationToken);
 
         var items = await db.Contents
             .AsNoTracking()
@@ -527,11 +544,12 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
                 .ThenInclude(cl => cl.Label)
             .Where(c => c.Status != "archived")
             .Where(c => c.RetryCount < 5)
-            .Where(c => !classifiedContentIds.Contains(c.Id))
+            .Where(c => !db.ClassifiedItems.Any(ci => ci.ContentId == c.Id))
+            .OrderByDescending(c => c.CreatedAt)
             .Take(limit)
             .ToListAsync(cancellationToken);
 
-        foreach (var item in items.OrderByDescending(c => c.CreatedAt))
+        foreach (var item in items)
         {
             yield return item;
         }

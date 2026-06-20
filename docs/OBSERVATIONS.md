@@ -16,21 +16,14 @@ WorkplaceIQ has `Label` and `ContentLabel` (a simple many-to-many join table), b
 
 SignalFlow had to add `ClassifiedItem` (`src/WorkplaceIQ/Content/ClassifiedItem.cs`) as a new top-level entity with a foreign key to `Content`. This is a **new table, new DbSet, new migrations**.
 
-### Specific Frictions
-
-- `ContentLabel` (`src/WorkplaceIQ/Labels/ContentLabel.cs`) is a bare-bones join with no metadata fields. It cannot be extended to hold embeddings or reasoning without breaking the existing label system's contract.
-- `ClassificationSources` (`src/WorkplaceIQ/Content/ClassifiedItem.cs:7-15`) is a static string-constants class — should be a platform enum.
-- The `Embedding` field is stored as `byte[]` because the platform has no vector data type. SignalFlow needed `EmbeddingSerializer` (`SignalFlow/Services/EmbeddingSerializer.cs`) to manually convert `float[] ↔ byte[]` via `MemoryMarshal.AsBytes` / `Buffer.BlockCopy`. This serialization detail should be transparent.
-- `ClassifiedItem` must manually join to `Content` and `Label` via navigation properties. Every query uses `.Include(x => x.RssItem).Include(x => x.SignalLabel)` — this is boilerplate that a more expressive content model would handle via generics.
-
 ### Resolution
 
-See [Proposal 1 — Vector Store Metadata Filtering](./PROPOSALS.md#proposal-1-vector-store-metadata-filtering) for the decided approach:
-
-- `ClassifiedItem` stays as the join between `Content` and `Label` — classification IS labeling, with metadata (reasoning, source, confidence) carried alongside.
-- The `Embedding byte[]` column is temporary. Vector data moves exclusively to the vector store (pgvector), where each entry carries metadata fields (Signal, IsNoise, ClassifiedAt) for filtered similarity search.
-- `ClassificationSources` becomes a platform `enum` in `WorkplaceIQ.Content`.
-- The `Include` boilerplate is accepted for now; convention-based EF config is future work.
+- `ClassifiedItem` is now the join between `Content` and `Label` — classification IS labeling, with metadata (reasoning, source, confidence) carried alongside. ✅
+- `ClassificationSource` is a free-text `string` (not an enum). Sources are extensible and new pipeline stages should not require code changes. ✅
+- The `Embedding byte[]` column is temporary. Vector data moves exclusively to the vector store (pgvector), where each entry carries metadata fields (Signal, IsNoise, ClassifiedAt) for filtered similarity search. 🟡
+- `Include` boilerplate extracted to `ClassifiedItemQuery()` helper in `EfWorkplaceIqStore`. ✅
+- One-classification-per-content invariant enforced via `UpsertClassifiedItemAsync`. ✅
+- Tests cover the upsert behavior — classify same content twice asserts last label wins. ✅
 
 ---
 
@@ -140,37 +133,6 @@ None of this existed in the platform. SignalFlow built it from scratch in `Pipel
 - `IJobProgress<T>` → SignalR adapter as a platform utility.
 - Job state tracking: `JobState.IsRunning`, `JobState.Progress`, `JobState.LastEvent`, persisted to DB.
 - A "Cancel" SignalR hub method as part of the job infrastructure.
-
----
-
-## 5. No Vector / Embedding Abstractions
-
-### Observation
-
-The platform has no concept of vector storage, embedding generation, or vector similarity search. SignalFlow built:
-
-| Component | File | Lines |
-|---|---|---|
-| `IVectorStore` | `SignalFlow/Services/IVectorStore.cs` | Interface |
-| `InMemoryVectorStore` | `SignalFlow/Services/InMemoryVectorStore.cs` | ~250 lines |
-| `EmbeddingService` | `SignalFlow/Services/EmbeddingService.cs` | 55 lines |
-| `EmbeddingSerializer` | `SignalFlow/Services/EmbeddingSerializer.cs` | 30 lines |
-| `VectorIndexEntry` | `SignalFlow/Models/VectorIndexEntry.cs` | Record model |
-
-### Specific Frictions
-
-- **No vector data type.** Embeddings are stored as `byte[]` in the `ClassifiedItem` table. Every read/write requires manual `EmbeddingSerializer.ToBytes` / `FromBytes` conversion. This is error-prone and obscures intent.
-- **No similarity search in store.** `MoreLikeAsync` (`FeedbackService.cs:79-100`) manually loads ALL embeddings into memory and computes cosine similarity with `TensorPrimitives.CosineSimilarity`. This is O(n) memory and O(n) CPU — not viable beyond ~10K items.
-- **No batch operations.** `InMemoryVectorStore.UpsertAsync` is per-item. The `UpsertBatchAsync` overload exists but the store interface has no batch semantics.
-- **No production store.** The only implementation is in-memory (`Microsoft.SemanticKernel.Connectors.InMemory`), which is volatile. Adding pgvector, Qdrant, or Azure AI Search requires building from scratch.
-
-### What WorkplaceIQ Should Provide
-
-- `IVectorStore<TEntry>` as a core platform abstraction.
-- `IEmbeddingService` as a core platform service.
-- `Embedding<T>` or `Vector<T>` value type with built-in serialization.
-- An in-memory implementation for development and a pgvector implementation for production.
-- A `SimilaritySearch` service that works at the store level rather than in-memory.
 
 ---
 
@@ -295,11 +257,10 @@ Several patterns in SignalFlow duplicate logic that should be in a single place.
 
 | Area | Impact | Effort to Fix |
 |---|---|---|
-| Classification data model | High — blocks all AI features | Medium (add entity + migration) |
+| Classification data model | High — blocks all AI features | ✅ Resolved |
 | Store interface | High — every feature adds methods | High (refactor to generic `IStore<T>`) |
-| EF/SQLite friction | Medium — performance at scale | Medium (add store primitives, recommend PG) |
+| EF/SQLite friction | Medium — performance at scale | ✅ Resolved |
 | Background jobs | High — needed for any pipeline | Medium (extract pattern) |
-| Vector/embedding | High — core AI primitive | Medium (add abstractions) |
 | Content ingestion | Medium — needed for external data | Medium (add connector pattern) |
 | Configuration | Low — works but fragile | Medium (add strongly-typed config) |
 | AI provider | Medium — blocks production AI | Low (add `IAiProvider` abstraction) |

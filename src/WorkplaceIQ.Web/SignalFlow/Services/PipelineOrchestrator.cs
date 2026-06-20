@@ -303,9 +303,9 @@ public class PipelineOrchestrator(
             HallucinatedSignal = decision.Result.HallucinatedSignal,
             Embedding = embedding.IsEmpty ? null : EmbeddingSerializer.ToBytes(embedding),
             ClassificationSource = decision.Source,
-            ClassifiedAt = DateTimeOffset.UtcNow
+            ClassifiedAt = DateTime.UtcNow
         };
-        await store.CreateClassifiedItemAsync(classifiedItem, ct);
+        await store.UpsertClassifiedItemAsync(classifiedItem, ct);
 
         if (!embedding.IsEmpty)
         {
@@ -316,7 +316,7 @@ public class PipelineOrchestrator(
                 Title = content.Title,
                 Summary = content.Body ?? string.Empty,
                 IsNoise = decision.Result.IsNoise,
-                ClassifiedAt = DateTimeOffset.UtcNow,
+                ClassifiedAt = DateTime.UtcNow,
                 Embedding = embedding
             }, ct);
 

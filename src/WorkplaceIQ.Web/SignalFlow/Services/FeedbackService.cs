@@ -61,7 +61,7 @@ public class FeedbackService(
 
         item.LabelId = label.Id;
         item.IsNoise = isNoise;
-        item.ClassifiedAt = DateTimeOffset.UtcNow;
+        item.ClassifiedAt = DateTime.UtcNow;
         await store.UpdateClassifiedItemAsync(item, ct);
         return true;
     }
@@ -142,7 +142,7 @@ public class FeedbackService(
         if (item is null) return false;
 
         item.IsNoise = false;
-        item.ClassifiedAt = DateTimeOffset.UtcNow;
+        item.ClassifiedAt = DateTime.UtcNow;
         await store.UpdateClassifiedItemAsync(item, ct);
         return true;
     }

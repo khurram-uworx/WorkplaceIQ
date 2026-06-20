@@ -38,7 +38,14 @@ public interface IWorkplaceIqStore
         int limit = 20,
         CancellationToken cancellationToken = default);
 
-    Task<ClassifiedItem> CreateClassifiedItemAsync(
+    /// <summary>
+    /// Create or update a classification for a content item.
+    /// Invariant: one ClassifiedItem per ContentId. If a classification already exists for this content,
+    /// it is updated in-place (last classification wins). This is the sole entry point for persisting
+    /// classification results — callers must not bypass this by manipulating ClassifiedItems directly.
+    /// ADR 02: when Content is refactored into Container/ContentItem, this invariant must be preserved.
+    /// </summary>
+    Task<ClassifiedItem> UpsertClassifiedItemAsync(
         ClassifiedItem item,
         CancellationToken cancellationToken = default);
 
