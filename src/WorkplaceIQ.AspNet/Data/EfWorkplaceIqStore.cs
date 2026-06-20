@@ -8,22 +8,24 @@ using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.AspNet.Data;
 
-public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkplaceIqStore
+public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> dbContextFactory) : IWorkplaceIqStore
 {
-    public Task<Content.Content?> GetContentByNameAsync(
+    public async Task<Content.Content?> GetContentByNameAsync(
         string name,
         CancellationToken cancellationToken = default)
     {
-        return dbContext.Contents
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Contents
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Name == name, cancellationToken);
     }
 
-    public Task<Content.Content?> GetContentByIdAsync(
+    public async Task<Content.Content?> GetContentByIdAsync(
         Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        return dbContext.Contents
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Contents
             .AsNoTracking()
             .Include(c => c.ContentLabels)
                 .ThenInclude(cl => cl.Label)
@@ -39,7 +41,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         string? contentType = null,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.Contents
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.Contents
             .AsNoTracking()
             .Include(c => c.ContentLabels)
                 .ThenInclude(cl => cl.Label)
@@ -60,7 +63,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         string contentType,
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.Contents
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Contents
             .AsNoTracking()
             .Where(c => c.ContentType == contentType)
             .Where(c => c.Status != "archived")
@@ -72,8 +76,9 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Content.Content content,
         CancellationToken cancellationToken = default)
     {
-        dbContext.Contents.Add(content);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.Contents.Add(content);
+        await db.SaveChangesAsync(cancellationToken);
         return content;
     }
 
@@ -81,8 +86,9 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Content.Content content,
         CancellationToken cancellationToken = default)
     {
-        dbContext.Contents.Update(content);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.Contents.Update(content);
+        await db.SaveChangesAsync(cancellationToken);
         return content;
     }
 
@@ -90,7 +96,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        var content = await dbContext.Contents.FirstOrDefaultAsync(c => c.Id == contentId, cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var content = await db.Contents.FirstOrDefaultAsync(c => c.Id == contentId, cancellationToken);
         if (content is null)
         {
             return;
@@ -98,14 +105,15 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
 
         content.Status = "archived";
         content.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Post>> GetPostsAsync(
         Guid containerId,
         CancellationToken cancellationToken = default)
     {
-        var posts = await dbContext.Posts
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var posts = await db.Posts
             .AsNoTracking()
             .Include(post => post.PostLabels)
                 .ThenInclude(postLabel => postLabel.Label)
@@ -117,11 +125,12 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             .ToList();
     }
 
-    public Task<Post?> GetPostByIdAsync(
+    public async Task<Post?> GetPostByIdAsync(
         Guid postId,
         CancellationToken cancellationToken = default)
     {
-        return dbContext.Posts
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Posts
             .AsNoTracking()
             .Include(post => post.PostLabels)
                 .ThenInclude(postLabel => postLabel.Label)
@@ -140,7 +149,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         string? metadataJson = null,
         CancellationToken cancellationToken = default)
     {
-        var containerType = await dbContext.Contents
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var containerType = await db.Contents
             .AsNoTracking()
             .Where(c => c.Id == containerId)
             .Select(c => c.ContentType)
@@ -159,11 +169,11 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        dbContext.Posts.Add(post);
+        db.Posts.Add(post);
 
         foreach (var labelName in labels)
         {
-            var label = await dbContext.Labels.FirstOrDefaultAsync(
+            var label = await db.Labels.FirstOrDefaultAsync(
                 candidate => candidate.NormalizedName == labelName.NormalizedName,
                 cancellationToken);
 
@@ -176,7 +186,7 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
                     Slug = labelName.Slug,
                     CreatedAt = DateTimeOffset.UtcNow
                 };
-                dbContext.Labels.Add(label);
+                db.Labels.Add(label);
             }
 
             post.PostLabels.Add(new PostLabel
@@ -186,7 +196,7 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             });
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
 
         return post;
     }
@@ -195,8 +205,9 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Post post,
         CancellationToken cancellationToken = default)
     {
-        dbContext.Posts.Update(post);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.Posts.Update(post);
+        await db.SaveChangesAsync(cancellationToken);
         return post;
     }
 
@@ -204,14 +215,15 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Guid postId,
         CancellationToken cancellationToken = default)
     {
-        var post = await dbContext.Posts.FirstOrDefaultAsync(candidate => candidate.Id == postId, cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var post = await db.Posts.FirstOrDefaultAsync(candidate => candidate.Id == postId, cancellationToken);
         if (post is null)
         {
             return;
         }
 
-        dbContext.Posts.Remove(post);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        db.Posts.Remove(post);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static string InferPostType(Guid? contentId, string? containerType)
@@ -230,7 +242,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Guid containerId,
         CancellationToken cancellationToken = default)
     {
-        var rows = await dbContext.FileRecords
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await db.FileRecords
             .AsNoTracking()
             .Include(file => file.Content!)
                 .ThenInclude(content => content.ContentLabels)
@@ -255,7 +268,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        var file = await dbContext.FileRecords
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var file = await db.FileRecords
             .AsNoTracking()
             .Include(candidate => candidate.Content!)
                 .ThenInclude(content => content.ContentLabels)
@@ -278,8 +292,10 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         FileRecord fileRecord,
         CancellationToken cancellationToken = default)
     {
-        dbContext.FileRecords.Add(fileRecord);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.FileRecords.Add(fileRecord);
+        await db.SaveChangesAsync(cancellationToken);
+        db.FileRecords.Remove(fileRecord);
 
         var file = await GetFileByContentIdAsync(fileRecord.ContentId, cancellationToken);
         return file ?? throw new InvalidOperationException($"File content '{fileRecord.ContentId}' was not found after creation.");
@@ -289,8 +305,9 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         ContentRelationship relationship,
         CancellationToken cancellationToken = default)
     {
-        dbContext.ContentRelationships.Add(relationship);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.ContentRelationships.Add(relationship);
+        await db.SaveChangesAsync(cancellationToken);
         return relationship;
     }
 
@@ -299,19 +316,20 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         LabelName label,
         CancellationToken cancellationToken = default)
     {
-        var labelEntity = await GetOrCreateLabelAsync(label, cancellationToken);
-        var exists = await dbContext.ContentLabels.AnyAsync(
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var labelEntity = await GetOrCreateLabelAsync(db, label, cancellationToken);
+        var exists = await db.ContentLabels.AnyAsync(
             cl => cl.ContentId == contentId && cl.LabelId == labelEntity.Id,
             cancellationToken);
 
         if (!exists)
         {
-            dbContext.ContentLabels.Add(new ContentLabel
+            db.ContentLabels.Add(new ContentLabel
             {
                 ContentId = contentId,
                 LabelId = labelEntity.Id
             });
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -320,27 +338,29 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         LabelName label,
         CancellationToken cancellationToken = default)
     {
-        var labelEntity = await GetOrCreateLabelAsync(label, cancellationToken);
-        var exists = await dbContext.PostLabels.AnyAsync(
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var labelEntity = await GetOrCreateLabelAsync(db, label, cancellationToken);
+        var exists = await db.PostLabels.AnyAsync(
             postLabel => postLabel.PostId == postId && postLabel.LabelId == labelEntity.Id,
             cancellationToken);
 
         if (!exists)
         {
-            dbContext.PostLabels.Add(new PostLabel
+            db.PostLabels.Add(new PostLabel
             {
                 PostId = postId,
                 LabelId = labelEntity.Id
             });
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 
-    private async Task<Label> GetOrCreateLabelAsync(
+    private static async Task<Label> GetOrCreateLabelAsync(
+        WorkplaceIqDbContext db,
         LabelName labelName,
         CancellationToken cancellationToken)
     {
-        var label = await dbContext.Labels.FirstOrDefaultAsync(
+        var label = await db.Labels.FirstOrDefaultAsync(
             candidate => candidate.NormalizedName == labelName.NormalizedName,
             cancellationToken);
 
@@ -356,18 +376,19 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             Slug = labelName.Slug,
             CreatedAt = DateTimeOffset.UtcNow
         };
-        dbContext.Labels.Add(label);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        db.Labels.Add(label);
+        await db.SaveChangesAsync(cancellationToken);
         return label;
     }
 
     // ----- Label queries -----
 
-    public Task<Label?> GetLabelByNameAsync(
+    public async Task<Label?> GetLabelByNameAsync(
         string name,
         CancellationToken cancellationToken = default)
     {
-        return dbContext.Labels
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Labels
             .AsNoTracking()
             .FirstOrDefaultAsync(l => l.NormalizedName == name.ToLowerInvariant(), cancellationToken);
     }
@@ -376,29 +397,32 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Label label,
         CancellationToken cancellationToken = default)
     {
-        dbContext.Labels.Add(label);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.Labels.Add(label);
+        await db.SaveChangesAsync(cancellationToken);
         return label;
     }
 
     // ----- Classification queries -----
 
-    public Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
+    public async Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        return dbContext.ClassifiedItems
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.ClassifiedItems
             .AsNoTrackingWithIdentityResolution()
             .Include(item => item.RssItem)
             .Include(item => item.SignalLabel)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
     }
 
-    public Task<ClassifiedItem?> GetClassifiedByContentIdAsync(
+    public async Task<ClassifiedItem?> GetClassifiedByContentIdAsync(
         Guid contentId,
         CancellationToken cancellationToken = default)
     {
-        return dbContext.ClassifiedItems
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.ClassifiedItems
             .AsNoTrackingWithIdentityResolution()
             .Include(item => item.RssItem)
             .Include(item => item.SignalLabel)
@@ -411,7 +435,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        var items = await dbContext.ClassifiedItems
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var items = await db.ClassifiedItems
             .AsNoTrackingWithIdentityResolution()
             .Include(item => item.RssItem)
             .Include(item => item.SignalLabel)
@@ -429,7 +454,8 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         int limit = 20,
         CancellationToken cancellationToken = default)
     {
-        var items = await dbContext.ClassifiedItems
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var items = await db.ClassifiedItems
             .AsNoTrackingWithIdentityResolution()
             .Include(item => item.RssItem)
             .Include(item => item.SignalLabel)
@@ -446,8 +472,9 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         ClassifiedItem item,
         CancellationToken cancellationToken = default)
     {
-        dbContext.ClassifiedItems.Add(item);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.ClassifiedItems.Add(item);
+        await db.SaveChangesAsync(cancellationToken);
         return item;
     }
 
@@ -455,15 +482,17 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         ClassifiedItem item,
         CancellationToken cancellationToken = default)
     {
-        dbContext.ClassifiedItems.Update(item);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.ClassifiedItems.Update(item);
+        await db.SaveChangesAsync(cancellationToken);
         return item;
     }
 
     public async Task<Dictionary<Guid, int>> GetSignalCountsAsync(
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.ClassifiedItems
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.ClassifiedItems
             .GroupBy(item => item.LabelId)
             .Select(group => new { LabelId = group.Key, Count = group.Count() })
             .ToDictionaryAsync(g => g.LabelId, g => g.Count, cancellationToken);
@@ -473,12 +502,13 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var item = await dbContext.ClassifiedItems
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await db.ClassifiedItems
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
         if (item is not null)
         {
-            dbContext.ClassifiedItems.Remove(item);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            db.ClassifiedItems.Remove(item);
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -486,11 +516,12 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         int limit,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var classifiedContentIds = await dbContext.ClassifiedItems
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var classifiedContentIds = await db.ClassifiedItems
             .Select(item => item.ContentId)
             .ToListAsync(cancellationToken);
 
-        var items = await dbContext.Contents
+        var items = await db.Contents
             .AsNoTracking()
             .Include(c => c.ContentLabels)
                 .ThenInclude(cl => cl.Label)
@@ -506,11 +537,12 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         }
     }
 
-    public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
+    public async Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
         string name,
         CancellationToken cancellationToken = default)
     {
-        return dbContext.MetricDefinitions
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.MetricDefinitions
             .AsNoTracking()
             .FirstOrDefaultAsync(m => m.Name == name, cancellationToken);
     }

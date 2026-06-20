@@ -22,7 +22,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         Action<DbContextOptionsBuilder> configureDbContext)
     {
-        services.AddDbContext<WorkplaceIqDbContext>(configureDbContext);
+        services.AddDbContextFactory<WorkplaceIqDbContext>(configureDbContext);
         services.AddScoped<IWorkplaceIqStore, EfWorkplaceIqStore>();
         services.AddScoped<IComponentService, ComponentService>();
         services.AddScoped<IFeedComponentService, FeedComponentService>();
@@ -48,4 +48,24 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    public static IServiceCollection AddWorkplaceIqSqliteStorage(
+        this IServiceCollection services,
+        string connectionString)
+        => services.AddWorkplaceIqAspNet(options => options.UseSqlite(connectionString));
+
+    public static IServiceCollection AddWorkplaceIqSqlServerStorage(
+        this IServiceCollection services,
+        string connectionString)
+        => services.AddWorkplaceIqAspNet(options => options.UseSqlServer(connectionString));
+
+    public static IServiceCollection AddWorkplaceIqPgVectorStorage(
+        this IServiceCollection services,
+        string connectionString)
+        => services.AddWorkplaceIqAspNet(options => options.UseNpgsql(connectionString));
+
+    public static IServiceCollection AddWorkplaceIqInMemoryStorage(
+        this IServiceCollection services,
+        string databaseName = "workplaceiq")
+        => services.AddWorkplaceIqAspNet(options => options.UseInMemoryDatabase(databaseName));
 }

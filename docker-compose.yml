@@ -1,24 +1,59 @@
+volumes:
+  pgvector_data:
+  workplaceiq-data:
+  minio-data:
+  grafana_data:
+
 services:
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.3
+    ports:
+      - "18888:18888"
+      - "4317:18889"
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: workplaceiq
+      POSTGRES_PASSWORD: workplaceiq
+      POSTGRES_DB: workplaceiq
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workplaceiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   workplaceiq-web:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "4792:4792"
+    volumes:
+      - workplaceiq-data:/app/App_Data
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:4792
-      ConnectionStrings__WorkplaceIQ: Data Source=/app/App_Data/workplaceiq.db
+      Storage__Provider: pgvector
+      ConnectionStrings__PgVector: Host=postgres;Port=5432;Database=workplaceiq;Username=workplaceiq;Password=workplaceiq
+      ConnectionStrings__Npgsql: Host=postgres;Port=5432;Database=workplaceiq;Username=workplaceiq;Password=workplaceiq
       WorkplaceIQ__Storage__Provider: MinIO
       WorkplaceIQ__Storage__Endpoint: http://minio:9000
       WorkplaceIQ__Storage__BucketName: workplaceiq-files
       WorkplaceIQ__Storage__AccessKey: workplaceiq
       WorkplaceIQ__Storage__SecretKey: workplaceiq-secret
       WorkplaceIQ__Storage__UseSsl: "false"
-    ports:
-      - "4792:4792"
-    volumes:
-      - workplaceiq-data:/app/App_Data
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+      OTEL_SERVICE_NAME: workplaceiq-web
     depends_on:
-      - minio
+      postgres:
+        condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
 
   minio:
     image: minio/minio:latest
@@ -32,6 +67,26 @@ services:
     volumes:
       - minio-data:/data
 
-volumes:
-  workplaceiq-data:
-  minio-data:
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - workplaceiq-web
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: workplaceiq
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus

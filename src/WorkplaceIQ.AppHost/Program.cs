@@ -1,8 +1,10 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres")
-    .WithDataVolume()
-    .AddDatabase("workplaceiq");
+    .WithImage("pgvector/pgvector")
+    .WithImageTag("pg16");
+
+var postgresDb = postgres.AddDatabase(name: "Npgsql", databaseName: "workplaceiq");
 
 var minio = builder.AddContainer("minio", "minio/minio:latest")
     .WithEnvironment("MINIO_ROOT_USER", "workplaceiq")
@@ -13,14 +15,17 @@ var minio = builder.AddContainer("minio", "minio/minio:latest")
     .WithArgs("server", "/data", "--console-address", ":9001");
 
 var web = builder.AddProject<Projects.WorkplaceIQ_Web>("workplaceiq-web")
-    .WithReference(postgres)
+    .WithReference(postgresDb)
+    .WithEnvironment("ConnectionStrings__PgVector",
+        postgresDb.Resource.ConnectionStringExpression)
+    .WithEnvironment("Storage__Provider", "pgvector")
     .WithEnvironment("WorkplaceIQ__Storage__Provider", "MinIO")
     .WithEnvironment("WorkplaceIQ__Storage__Endpoint", minio.GetEndpoint("api"))
     .WithEnvironment("WorkplaceIQ__Storage__BucketName", "workplaceiq-files")
     .WithEnvironment("WorkplaceIQ__Storage__AccessKey", "workplaceiq")
     .WithEnvironment("WorkplaceIQ__Storage__SecretKey", "workplaceiq-secret")
     .WithEnvironment("WorkplaceIQ__Storage__UseSsl", "false")
-    .WaitFor(postgres)
+    .WaitFor(postgresDb)
     .WaitFor(minio);
 
 builder.Build().Run();

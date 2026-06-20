@@ -1,123 +1,76 @@
-# Potential AI Features
+# Potential AI Features — Extraction & Platform Alignment
 
-> **Context:** SignalFlow (`src/WorkplaceIQ.Web/SignalFlow/`) is a real-world AI Data Engineering pipeline implemented on WorkplaceIQ. This document catalogs the patterns, abstractions, and services that SignalFlow built — each of which is a candidate for extraction into WorkplaceIQ's platform "intelligence layer."
+> **Context:** SignalFlow (`src/WorkplaceIQ.Web/SignalFlow/`) is a real-world AI Data Engineering pipeline on WorkplaceIQ. This document catalogs patterns, abstractions, and services worth extracting into WorkplaceIQ's platform "intelligence layer." Every extraction builds on Microsoft's official .NET AI stack: MEAI, MEVD, MEDI, and System.Numerics.Tensors.
 >
 > Priority levels: **P0** = core AI primitive, **P1** = important AI infrastructure, **P2** = useful pattern, **P3** = nice-to-have model.
 
 ---
 
-## P0: `IVectorStore` — Vector Storage Abstraction
+## Platform Alignment
 
-**Prerequisite:** [Proposal 1 — Vector Store Metadata Filtering](./PROPOSALS.md#proposal-1-vector-store-metadata-filtering) defines the `SearchFilter` design and metadata fields on vector entries. This section assumes that proposal is accepted.
+SignalFlow already aligns with Microsoft's .NET AI ecosystem:
 
-### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/IVectorStore.cs` + `InMemoryVectorStore.cs`
+| Pillar | Package | Used In | Status |
+|---|---|---|---|
+| **MEAI** | `Microsoft.Extensions.AI` | `EmbeddingService` (via `IEmbeddingGenerator`), chat via `IChatClient` | ✓ Used directly |
+| **MEVD** | `Microsoft.Extensions.VectorData` (+ `*Connectors.InMemory`) | `VectorClassifier`, `FeedbackService`, `PipelineOrchestrator` via `VectorStore` | ✓ Used directly |
+| **System.Numerics.Tensors** | `System.Numerics.Tensors` | `CategoryCentroidTracker` (`TensorPrimitives.CosineSimilarity`) | ✓ Used directly |
 
-### Current Form
-An interface with these key methods:
-```csharp
-Task UpsertAsync(VectorIndexEntry entry, CancellationToken ct);
-Task UpsertBatchAsync(IEnumerable<VectorIndexEntry> entries, CancellationToken ct);
-Task<IAsyncEnumerable<(VectorIndexEntry Record, float Score)>> SearchAsync(
-    ReadOnlyMemory<float> embedding, int topK, CancellationToken ct);
-Task<long> CountAsync(CancellationToken ct);
-Task ClearAsync(CancellationToken ct);
-```
+The two remaining platform pillars are adoption candidates:
 
-Implemented once (`InMemoryVectorStore` wrapping `Microsoft.SemanticKernel.Connectors.InMemory`). Not persisted across app restarts.
-
-### What to Extract
-- Move `IVectorStore` to `WorkplaceIQ.AI.Abstractions`.
-- Add a `pgvector` implementation using Npgsql's vector support (`CREATE EXTENSION vector`, `halfvec` type).
-- Consider a provider model: `AddVectorStore<TImplementation>()` with DI registration for InMemory (dev) and pgvector (prod).
-- Simplify the `SearchAsync` return type: `IAsyncEnumerable<(TEntry Record, float Score)>` is awkward. `IReadOnlyList<SearchHit>` is cleaner.
-- **Add `SearchFilter` support** (per Proposal 1) so callers can scope searches by signal, exclude noise, etc.
-
-### API Surface (Proposed)
-
-```csharp
-// WorkplaceIQ.AI.Abstractions
-public sealed record SearchFilter
-{
-    public string? SignalEquals { get; init; }
-    public bool? ExcludeNoise { get; init; }
-    public DateTimeOffset? ClassifiedAfter { get; init; }
-    public IReadOnlySet<string>? ContentIdIn { get; init; }
-}
-
-public sealed record VectorEntry(
-    string Id,
-    string ContentId,
-    string Signal,
-    string Title,
-    string Summary,
-    bool IsNoise,
-    DateTimeOffset ClassifiedAt,
-    ReadOnlyMemory<float> Embedding);
-
-public sealed record SearchHit(
-    VectorEntry Entry,
-    float Score);
-
-public interface IVectorStore
-{
-    Task UpsertAsync(VectorEntry entry, CancellationToken ct = default);
-    Task UpsertBatchAsync(IEnumerable<VectorEntry> entries, CancellationToken ct = default);
-    Task<IReadOnlyList<SearchHit>> SearchAsync(
-        ReadOnlyMemory<float> embedding,
-        int topK,
-        SearchFilter? filter = null,
-        CancellationToken ct = default);
-    Task<long> CountAsync(CancellationToken ct = default);
-    Task ClearAsync(CancellationToken ct = default);
-}
-```
-
-### Migration Notes
-
-- `ClassifiedItem.Embedding byte[]` is temporary. Once pgvector is production, the column can be dropped — the vector store becomes the sole vector source.
-- The `VectorEntry` metadata fields (`Signal`, `IsNoise`, `ClassifiedAt`) are already populated by `PipelineOrchestrator.PersistResultAsync` — they just need to be plumbed into the store.
-- `InMemoryVectorStore` applies filters client-side after search (acceptable for dev scale). pgvector applies them via SQL `WHERE` clauses for index-assisted filtering.
+| Pillar | Package | When |
+|---|---|---|
+| **MEDI** | `Microsoft.Extensions.DataIngestion` | When chunking/enrichment needs a formal pipeline |
+| **MCP** | Model Context Protocol providers | When capabilities need to cross process boundaries |
 
 ---
 
-## P0: `IEmbeddingService` — Embedding Generation Abstraction
+## P0: MEVD VectorStore — Platform Alignment (Done)
 
-### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/EmbeddingService.cs`
+### Current State
 
-### Current Form
-A concrete class wrapping `IEmbeddingGenerator<string, Embedding<float>>` with:
-- 8000-character text truncation before embedding
-- `RssItem`-to-text composition: `$"{item.Title}\n{item.Summary}"`
+SignalFlow uses `VectorStore` (MEVD) directly — no custom `IVectorStore` wrapper. The collection type is `SignalFlowVectorEntry` with MEVD attributes (`[VectorStoreKey]`, `[VectorStoreData]`, `[VectorStoreVector]`). The in-memory provider (`Microsoft.SemanticKernel.Connectors.InMemory`) is used for development.
+
+### What to Extract / Improve
+
+- **Provider swap to pgvector**: Replace `InMemoryVectorStore` DI registration with `Microsoft.SemanticKernel.Connectors.PgVector` for production.
+- **Dimension as config**: Currently hard-coded at 1536 in `SignalFlowVectorEntry`. Make configurable via `VectorStoreRecordCollectionDefinition` or a `VectorSchema.Create(dimension)` factory.
+- **Drop `ClassifiedItem.Embedding byte[]`**: Once pgvector is production, the vector store is the sole embedding source; remove the redundant column.
+- **Migration to `VectorStoreRecordCollection<TKey, TRecord>`**: MEVD's newer collection API provides richer functionality; validate feature parity.
+
+### Key Points
+
+- No custom vector store abstraction needed — MEVD is the standard .NET abstraction.
+- `VectorSearchOptions<TRecord>.Filter` provides LINQ-based filtering (no custom `SearchFilter` DSL).
+- Provider portability = single DI swap, zero application code changes.
+
+---
+
+## P0: MEAI Embedding Generation — Platform Alignment (Done)
+
+### Current State
+
+`EmbeddingService` wraps `IEmbeddingGenerator<string, Embedding<float>>` (MEAI) with:
+- 8000-character text truncation
+- `RssItem`-to-text composition (`$"{item.Title}\n{item.Summary}"`)
 - `ConfigureAwait(false)` on all async calls
 
-```csharp
-public async Task<ReadOnlyMemory<float>> GenerateAsync(RssItem item, CancellationToken ct = default)
-{
-    var text = $"{item.Title}\n{item.Summary ?? string.Empty}";
-    if (text.Length > 8000) text = text[..8000];
-    var embedding = await generator.GenerateAsync(text, cancellationToken: ct).ConfigureAwait(false);
-    return embedding.First().Vector;
-}
-```
+### What to Extract / Improve
 
-### What to Extract
-- Move to `WorkplaceIQ.AI.Abstractions` as `IEmbeddingService` with overloads for common inputs.
-- Add a `GenerateAsync(string text)` overload for free-form text.
-- Add a `GenerateAsync<T>(T item, Func<T, string> textSelector)` overload for typed items.
-- Add truncation as a configurable option, not a hard-coded constant.
-- Add retry / fallback: if the primary embedding model fails, try a secondary model.
-- Make `EmbeddingService` a platform service auto-registered via `AddWorkplaceIQAI()`.
+- Make truncation a configurable option, not a hard-coded constant.
+- Add retry / fallback: if primary embedding model fails, try a secondary.
+- Register as DI service: `services.AddSingleton<IEmbeddingGenerator>(sp => ...)`.
+- Consider `EmbeddingGeneratorBuilder` for pipeline composition (MEAI middleware pattern).
 
 ### API Surface (Proposed)
 
 ```csharp
-// WorkplaceIQ.AI.Abstractions
-public interface IEmbeddingService
+// No new interface needed — use IEmbeddingGenerator directly.
+// Add configuration via options pattern:
+public sealed record EmbeddingOptions
 {
-    Task<ReadOnlyMemory<float>> GenerateAsync(string text, CancellationToken ct = default);
-    Task<ReadOnlyMemory<float>> GenerateAsync<T>(T item, Func<T, string> textSelector, CancellationToken ct = default);
+    public int MaxChars { get; init; } = 8000;
+    public string? FallbackModel { get; init; }
 }
 ```
 
@@ -132,10 +85,8 @@ public interface IEmbeddingService
 - `src/WorkplaceIQ/Content/ClassifiedItem.cs` (the `ClassificationSources` constants)
 
 ### Current Form
-Three records and a static constants class:
 
 ```csharp
-// ClassificationResult — structured LLM output
 public sealed record ClassificationResult
 {
     public string Signal { get; init; } = string.Empty;
@@ -144,7 +95,6 @@ public sealed record ClassificationResult
     public string? HallucinatedSignal { get; init; }
 }
 
-// ClassificationDecision — pipeline outcome
 public sealed record ClassificationDecision
 {
     public ClassificationResult Result { get; init; } = new();
@@ -152,73 +102,41 @@ public sealed record ClassificationDecision
     public NeighborStats? Stats { get; init; }
     public bool WasAutoLabelled { get; init; }
 }
-
-// NeighborStats — vector search gating
-public sealed record NeighborStats { ... }
-
-// ClassificationSources
-public static class ClassificationSources
-{
-    public const string Bootstrap = "Bootstrap";
-    public const string VectorAuto = "VectorAuto";
-    public const string LlmSparseNeighbors = "LlmSparseNeighbors";
-    public const string LlmLowConfidence = "LlmLowConfidence";
-    public const string LlmEmbeddingFailed = "LlmEmbeddingFailed";
-    public const string Failed = "Failed";
-}
 ```
 
 ### What to Extract
-- Move to `WorkplaceIQ.AI.Models` as proper types.
-- Convert `ClassificationSources` to `enum ClassificationSource { Bootstrap, VectorAuto, LlmSparseNeighbors, LlmLowConfidence, LlmEmbeddingFailed, Failed }`.
+
+- Move to `WorkplaceIQ.AI.Models` as shared types.
+- Convert `ClassificationSources` constants to `enum ClassificationSource`.
 - Add EF Core value converter for the enum to string column.
-- Make `NeighborStats.FromInline()` / `NeighborStats.Empty()` part of the platform API.
 - Add JSON serialization attributes for SignalR / API use.
-
-### API Surface (Proposed)
-
-```csharp
-// WorkplaceIQ.AI.Models
-public enum ClassificationSource
-{
-    Bootstrap,
-    VectorAuto,
-    LlmSparseNeighbors,
-    LlmLowConfidence,
-    LlmEmbeddingFailed,
-    Failed
-}
-```
 
 ---
 
 ## P1: `VectorClassifier` — Multi-Strategy Hybrid Classifier
 
 ### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/VectorClassifier.cs` (171 lines)
+`src/WorkplaceIQ.Web/SignalFlow/Services/VectorClassifier.cs`
 
 ### Current Form
-A concrete class implementing a 3-tier hybrid classification strategy:
 
-1. **Bootstrap** (below `bootstrapThreshold` = 20 classified items): Direct LLM fallback. No vector search yet.
-2. **Vector Auto** (above threshold, high confidence): kNN search → confidence gates (min neighbors, min agreement, min similarity, min margin) → centroid agreement check → `VectorAuto` classification.
-3. **LLM Fallback** (sparse neighbors or low confidence): When vector search yields too few neighbors (`< minNeighbors`) or fails gate checks, falls back to LLM via `LlmFallbackDelegate`.
+A concrete class implementing a 3-tier hybrid classification strategy on top of MEVD `VectorStore`:
 
-Configurable gates: `topK=10`, `minNeighbors=5`, `minNeighborAgreement=5`, `minAvgSimilarity=0.86`, `minMargin=0.10`.
+1. **Bootstrap** (< 20 classified items): Direct LLM fallback. No vector search.
+2. **Vector Auto** (≥ threshold, high confidence): kNN search via `collection.SearchAsync()` → confidence gates (min neighbors, min agreement, min similarity, min margin) → centroid agreement → `VectorAuto`.
+3. **LLM Fallback** (sparse neighbors or low confidence): Falls back to `IChatClient` via `LlmFallbackDelegate`.
+
+Gates: `topK=10`, `minNeighbors=5`, `minNeighborAgreement=5`, `minAvgSimilarity=0.86`, `minMargin=0.10`.
 
 ### What to Extract
-- Refactor into a strategy pattern: `IClassificationStrategy` with implementations:
-  - `VectorClassificationStrategy` — pure vector-kNN with confidence gates
-  - `LlmClassificationStrategy` — pure LLM classification
-  - `HybridClassificationStrategy` — the multi-tier strategy with fallback
-- Extract `LlmFallbackDelegate` as an `IChatClient`-based default implementation.
-- Move gate parameters into a `ClassificationOptions` record: `BootstrapThreshold`, `TopK`, `MinNeighbors`, `MinNeighborAgreement`, `MinAvgSimilarity`, `MinMargin`.
-- Inject via DI: `services.AddHybridClassifier(options => { ... })`.
+
+- Refactor into strategy pattern: `IClassificationStrategy` with `VectorClassificationStrategy`, `LlmClassificationStrategy`, `HybridClassificationStrategy`.
+- Extract gate parameters into `ClassificationOptions` record.
+- Inject via DI: `services.AddHybridClassifier(options => ...)`.
 
 ### API Surface (Proposed)
 
 ```csharp
-// WorkplaceIQ.AI.Classifiers
 public sealed record ClassificationOptions
 {
     public int BootstrapThreshold { get; init; } = 20;
@@ -242,104 +160,49 @@ public interface IClassificationStrategy
 ## P1: `CategoryCentroidTracker` — Incremental Centroid Computation
 
 ### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/CategoryCentroidTracker.cs` (121 lines)
+`src/WorkplaceIQ.Web/SignalFlow/Services/CategoryCentroidTracker.cs`
 
 ### Current Form
-Thread-safe, incremental running-mean centroid tracker per category (signal):
-- `AddOrUpdate(signal, embedding)` — O(1) update using Welford's online algorithm
-- `GetCentroidSimilarity(signal, embedding)` — cosine similarity between embedding and signal's centroid
-- `GetBestCentroidMatch(embedding, minSimilarity)` — find best-matching signal across all centroids
-- Thread-safe via `ConcurrentDictionary` with per-centroid locking
-- Dimensionality validation on first update to prevent silent corruption
+
+Thread-safe, incremental running-mean centroid tracker per category using Welford's online algorithm:
+- `AddOrUpdate(signal, embedding)` — O(1)
+- `GetCentroidSimilarity(signal, embedding)` — cosine via `TensorPrimitives.CosineSimilarity`
+- `GetBestCentroidMatch(embedding, minSimilarity)` — best match across all centroids
+- `ConcurrentDictionary` with per-key locking
 
 ### What to Extract
-- Move to `WorkplaceIQ.AI` as `ICentroidTracker` interface with `InMemoryCentroidTracker` implementation.
-- Add `RedisCentroidTracker` for distributed scenarios (multiple app instances).
-- Add centroid persistence: serialize centroids to DB so they survive restarts (currently rebuilt from `ClassifiedItem` table on each pipeline start via `RestoreVectorStateAsync`).
+
+- `ICentroidTracker` interface with `InMemoryCentroidTracker` implementation.
+- Add `RedisCentroidTracker` for distributed scenarios.
+- Add centroid persistence (currently rebuilt from `ClassifiedItem` table on startup).
 - Register as singleton: `services.AddSingleton<ICentroidTracker, InMemoryCentroidTracker>()`.
-
-### API Surface (Proposed)
-
-```csharp
-// WorkplaceIQ.AI
-public interface ICentroidTracker
-{
-    void AddOrUpdate(string category, ReadOnlyMemory<float> embedding);
-    float? GetCentroidSimilarity(string category, ReadOnlyMemory<float> embedding);
-    (string Category, float Score)? GetBestCentroidMatch(
-        ReadOnlyMemory<float> embedding, float minSimilarity = 0f);
-    IReadOnlyDictionary<string, CentroidState> GetAll();
-}
-
-public sealed record CentroidState(
-    string Category,
-    int Count,
-    ReadOnlyMemory<float> Centroid);
-```
 
 ---
 
 ## P1: `IFeedbackService` — Human-in-the-Loop Pattern
 
 ### Source
-- `src/WorkplaceIQ.Web/SignalFlow/Services/IFeedbackService.cs`
-- `src/WorkplaceIQ.Web/SignalFlow/Services/FeedbackService.cs` (151 lines)
+`src/WorkplaceIQ.Web/SignalFlow/Services/IFeedbackService.cs` + `FeedbackService.cs`
 
 ### Current Form
-A service that provides both read queries (dashboard data) and write operations (feedback actions):
 
-```csharp
-public interface IFeedbackService
-{
-    // Read queries
-    Task<List<SignalGroup>> GetSignalsAsync(CancellationToken ct);
-    Task<IReadOnlyList<ClassifiedItem>> GetRecentItemsAsync(int limit, CancellationToken ct);
-    Task<List<ClassifiedItem>> GetNoiseAsync(CancellationToken ct);
-    Task<List<ClassifiedItem>> GetBouncedAsync(CancellationToken ct);
-    Task<ClassifiedItem?> GetItemDetailsAsync(Guid itemId, CancellationToken ct);
-    Task<Dictionary<string, int>> GetSignalCountsAsync(CancellationToken ct);
-    Task<int> GetNoiseCountAsync(CancellationToken ct);
-    Task<int> GetFailedCountAsync(CancellationToken ct);
-
-    // Write operations
-    Task<bool> ReclassifyAsync(Guid itemId, string newSignal, bool isNoise, CancellationToken ct);
-    Task<bool> DeleteItemAsync(Guid itemId, CancellationToken ct);
-    Task<bool> MarkNotNoiseAsync(Guid classifiedId, CancellationToken ct);
-    Task<(bool Success, ClassifiedItem? Item)> RetryFailedAsync(Guid classifiedId, CancellationToken ct);
-    Task<List<(ClassifiedItem Item, double Score)>> MoreLikeAsync(Guid classifiedId, int top, CancellationToken ct);
-}
-```
+A service with both read queries (dashboard data) and write operations (feedback actions). `MoreLikeAsync` delegates to MEVD `VectorStore.SearchAsync()` — O(1) memory, not O(n).
 
 ### What to Extract
-- Split into `IClassificationStore` (read queries) and `IClassificationFeedback` (write operations) for separation of concerns.
-- Make the interface generic: `IClassificationFeedback<TEntity>` or parameterize by entity type.
-- Extract `MoreLikeAsync` into a `ISimilaritySearch` service that works at the store level (not loading everything into memory).
-- Move `RetryFailedAsync` logic (reset attempt count, re-queue for classification) into the job/pipeline infrastructure.
 
-### Key Pattern: MoreLikeAsync
-
-```csharp
-// Current: loads ALL embeddings into memory
-var candidates = await store.GetRecentClassifiedItemsAsync(int.MaxValue, ct);
-foreach (var c in candidates)
-{
-    var sim = TensorPrimitives.CosineSimilarity(targetVec.Span, vec.Span);
-    scores.Add((c, sim));
-}
-return scores.OrderByDescending(x => x.Score).Take(top).ToList();
-```
-
-This is O(n) memory and O(n) CPU. With 100K items, this allocates `100K × ClassifiedItem` objects and computes `100K` cosine similarities. The platform should delegate this to `IVectorStore.SearchAsync()`.
+- Split into `IClassificationStore` (reads) and `IClassificationFeedback` (writes).
+- Extract `RetryFailedAsync` logic into the job infrastructure.
+- Make `MoreLikeAsync` a reusable `ISimilaritySearch` service.
 
 ---
 
 ## P1: `EmbeddingSerializer` — Vector Serialization Utility
 
 ### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/EmbeddingSerializer.cs` (30 lines)
+`src/WorkplaceIQ.Web/SignalFlow/Services/EmbeddingSerializer.cs`
 
 ### Current Form
-Two static methods for `float[] ↔ byte[]` round-trip:
+
 ```csharp
 public static byte[] ToBytes(ReadOnlyMemory<float> embedding)
     => MemoryMarshal.AsBytes(embedding.Span).ToArray();
@@ -349,8 +212,9 @@ public static ReadOnlyMemory<float> FromBytes(byte[] bytes)
 ```
 
 ### What to Extract
-- Move to `WorkplaceIQ.AI.Utilities` or make it a method on an `Embedding<T>` value type.
-- Add null/empty handling (return `ReadOnlyMemory<float>.Empty` for null/empty byte arrays).
+
+- Move to `WorkplaceIQ.AI.Utilities`.
+- Add null/empty handling.
 - Consider `Embedding<T>` struct that wraps `ReadOnlyMemory<float>` and handles serialization internally.
 
 ---
@@ -358,153 +222,40 @@ public static ReadOnlyMemory<float> FromBytes(byte[] bytes)
 ## P2: `PipelineBackgroundService` — Background Job Infrastructure
 
 ### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/PipelineBackgroundService.cs` (113 lines)
+`src/WorkplaceIQ.Web/SignalFlow/Services/PipelineBackgroundService.cs`
 
 ### Current Form
+
 A `BackgroundService` that:
-- Accepts pipeline requests via a `Channel<PipelineRequest>` (bounded, single-reader, drop-write on overflow)
-- Creates a DI scope per pipeline run
+- Accepts requests via `Channel<PipelineRequest>` (bounded, single-reader, drop-write on overflow)
+- Creates DI scope per pipeline run
 - Tracks `PipelineState(IsRunning, LastEvent?)` for reconnection recovery
-- Uses `PipelineProgressReporter` to bridge `IProgress<PipelineEvent>` to SignalR broadcasts
-- Handles `OperationCanceledException` and unexpected exceptions
+- Uses `PipelineProgressReporter` to bridge `IProgress<PipelineEvent>` → SignalR
 
 ### What to Extract
 
-**Core components:**
-
-1. **`JobQueue<TJob>`** — A channel-based queue with:
-   - Single-reader guarantee
-   - Backpressure via bounded channel
-   - Optional DB persistence for crash recovery
-   - `TryEnqueue(TJob) → bool` (returns false if queue full)
-   - `GetState() → JobState` for monitoring
-
-2. **`JobRunner<TJob, TEvent>`** — A `BackgroundService` base class:
-   - Reads from `JobQueue`
-   - Creates DI scopes
-   - Manages cancellation tokens
-   - Tracks running state
-   - Reports progress via `IProgress<TEvent>`
-
-3. **`ProgressToSignalRAdapter<T>`** — A reusable `IProgress<T>` → SignalR adapter:
-   - Sends typed messages to `Clients.All` (or a specific group)
-   - Fire-and-forget with proper exception handling (log, don't swallow)
-   - Optionally stores last event for reconnection recovery
-
+1. **`JobQueue<TJob>`** — Channel-based queue with backpressure.
+2. **`JobRunner<TJob, TEvent>`** — `BackgroundService` base class:
+   - Reads from queue, creates DI scopes, manages cancellation, tracks state.
+3. **`ProgressReporter<TEvent>`** — Generic `IProgress<T>` → SignalR adapter.
 4. **Job event types** — Generic discriminated union:
-   - `JobStarted<TStage>`
-   - `JobProgress<TStage>`
-   - `JobItemProcessed<TItem>`
-   - `JobFailed<TStage>`
-   - `JobCompleted`
+   - `JobStarted<TStage>`, `JobProgress<TStage>`, `JobItemProcessed<TItem>`, `JobFailed<TStage>`, `JobCompleted`
 
 ### API Surface (Proposed)
 
 ```csharp
-// WorkplaceIQ.Jobs
 public interface IJobQueue<TJob>
 {
     bool TryEnqueue(TJob job);
     JobState GetState();
 }
 
-public sealed record JobState(bool IsRunning, JobEvent? LastEvent);
-
 public abstract class JobRunner<TJob, TEvent> : BackgroundService
 {
     protected abstract IJobQueue<TJob> Queue { get; }
     protected abstract Task RunAsync(TJob job, IProgress<TEvent> progress, CancellationToken ct);
-    // + OnCompleted, OnFailed virtual methods
 }
 ```
-
----
-
-## P2: `PipelineProgressReporter` — Progress to SignalR Adapter
-
-### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/PipelineBackgroundService.cs:95-112`
-
-### Current Form
-```csharp
-sealed class PipelineProgressReporter(
-    IHubContext<PipelineHub> hubContext,
-    Action<PipelineEvent> onReport) : IProgress<PipelineEvent>
-{
-    public void Report(PipelineEvent value)
-    {
-        onReport(value);
-        _ = hubContext.Clients.All.SendAsync("pipelineEvent", value, CancellationToken.None);
-    }
-}
-```
-
-### What to Extract
-- Generic version: `ProgressReporter<TEvent>(IHubContext hub, string methodName, Action<TEvent> onReport)`.
-- Add proper logging (not silent catch).
-- Add optional group targeting (`Clients.Group(groupName)` instead of `Clients.All`).
-- Add batching for high-frequency events.
-
----
-
-## P2: `ConfigLoader` — Feature Configuration Pattern
-
-### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/ConfigLoader.cs` (106 lines)
-
-### Current Form
-A file-based config loader that reads markdown files from a directory and parses them into a `PipelineConfig`:
-- `source.md` → feed sources
-- `signals.md` → signal names
-- `goal.md` → goal text
-- `prompt.md` → prompt template
-- `engine.md` → numeric/dictionary engine settings
-
-### What to Extract
-- `IFeatureConfiguration<TConfig>` interface with `LoadAsync(string path) → TConfig`.
-- Multiple backend implementations:
-  - `FileConfigProvider<TConfig>` — reads from file system
-  - `JsonConfigProvider<TConfig>` — reads from JSON
-  - `DbConfigProvider<TConfig>` — reads from DB
-- Merge/override logic: env vars override file settings, file settings override defaults.
-- Schema validation (JSON Schema or `System.ComponentModel.DataAnnotations`).
-
-This is a medium-sized abstraction that would replace ad-hoc parsing across all WorkplaceIQ features.
-
----
-
-## P2: `RssFetcher` — Content Connector Pattern
-
-### Source
-`src/WorkplaceIQ.Web/SignalFlow/Services/RssFetcher.cs` (50 lines)
-
-### Current Form
-A static class that fetches an RSS feed and yields `RssItem` records:
-```csharp
-public static async IAsyncEnumerable<RssItem> FetchFeedAsync(
-    string url, string name, [EnumeratorCancellation] CancellationToken ct)
-{
-    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-    var response = await client.GetAsync(url, ct);
-    // ... SyndicationFeed.Load(xmlReader) ...
-    foreach (var item in feed.Items)
-        yield return new RssItem { ... ContentHash = sha256(...) };
-}
-```
-
-### What to Extract
-- `IContentConnector<TItem>` interface:
-  ```csharp
-  public interface IContentConnector<TItem>
-  {
-      string ConnectorType { get; } // "rss", "atom", "api", etc.
-      IAsyncEnumerable<TItem> FetchAsync(CancellationToken ct = default);
-  }
-  ```
-- `RssConnector` implementation using `IHttpClientFactory` (not raw `HttpClient`).
-- Content hash / fingerprint as a platform primitive (`IContentHasher` with SHA256 implementation).
-- `IConnectorRegistry` to register and enumerate connectors.
-- `ConnectorOptions` for timeout, retry, user-agent configuration.
 
 ---
 
@@ -514,10 +265,9 @@ public static async IAsyncEnumerable<RssItem> FetchFeedAsync(
 `src/WorkplaceIQ.Web/SignalFlow/Models/PipelineEvent.cs`
 
 ### Current Form
-Polymorphic records with `[JsonDerivedType]` attributes for SignalR serialization:
 
 ```
-PipelineEvent (base)
+PipelineEvent (base, with [JsonDerivedType])
 ├── PipelineStarted(totalFeeds)
 ├── PipelineProgress(stage, current, total, message?)
 ├── PipelineItemProcessed(id, title, signal, isNoise, reasoning, hallucinatedSignal?)
@@ -526,53 +276,62 @@ PipelineEvent (base)
 ```
 
 ### What to Extract
-- Generic job event types: `JobEvent` base with `JobStarted<TConfig>`, `JobProgress<TStage>`, `JobItemProcessed<TItem>`, `JobFailed`, `JobCompleted`.
-- Keep `[JsonDerivedType]` serialization for SignalR compatibility.
-- Move to `WorkplaceIQ.Jobs.Events` namespace.
+
+- Generic job event types in `WorkplaceIQ.Jobs.Events`.
+- Keep `[JsonDerivedType]` for SignalR compatibility.
 
 ---
 
-## P3: Extended AI Models
-
-### SignalGroup
-`src/WorkplaceIQ.Web/SignalFlow/Models/SignalGroup.cs`
-```csharp
-public sealed record SignalGroup
-{
-    public string Signal { get; init; } = string.Empty;
-    public int Count { get; init; }
-    public List<ClassifiedItem> Items { get; init; } = [];
-}
-```
-Extract to `WorkplaceIQ.AI.Models` as a general-purpose aggregate result type.
-
-### VectorIndexEntry
-`src/WorkplaceIQ.Web/SignalFlow/Models/VectorIndexEntry.cs`
-Currently has `[VectorStoreKey]` and `[VectorStoreData]` attributes from `Microsoft.SemanticKernel`. If the platform provides `IVectorStore`, this becomes the platform's entry type.
-
-### PipelineConfig
-`src/WorkplaceIQ.Web/SignalFlow/Models/PipelineConfig.cs`
-Extract to `WorkplaceIQ.AI.Configuration` as `AiPipelineConfig` or `ClassificationPipelineConfig`.
-Current fields:
-- `FeedSources`, `Goal`, `Signals`, `PromptTemplate`
-- `Endpoint`, `ApiKey`, `EmbeddingModel`, `LlmModel`, `EmbeddingDimension`
-- Classifier thresholds (`BootstrapThreshold`, `TopK`, `MinNeighbors`, etc.)
-
----
-
-## P3: `PipelineRequest` — Job Request Model
+## P2: `RssFetcher` — Content Connector Pattern
 
 ### Source
-`src/WorkplaceIQ.Web/SignalFlow/Models/PipelineRequest.cs`
+`src/WorkplaceIQ.Web/SignalFlow/Services/RssFetcher.cs`
 
-```csharp
-public sealed record PipelineRequest(
-    string ConnectionId,
-    PipelineConfig Config,
-    CancellationToken RequestAborted);
-```
+### What to Extract
 
-Extract to a generic `JobRequest<TConfig>` record as part of the job infrastructure.
+- `IContentConnector<TItem>` interface with `RssConnector` implementation.
+- Use `IHttpClientFactory` instead of raw `HttpClient`.
+- Content hash / fingerprint as `IContentHasher` with SHA256.
+- `IConnectorRegistry` to register/enumerate connectors.
+
+---
+
+## P2: `ConfigLoader` — Feature Configuration Pattern
+
+### Source
+`src/WorkplaceIQ.Web/SignalFlow/Services/ConfigLoader.cs`
+
+### What to Extract
+
+- `IFeatureConfiguration<TConfig>` interface.
+- Backends: `FileConfigProvider`, `JsonConfigProvider`, `DbConfigProvider`.
+- Merge/override: env vars > files > defaults.
+- Schema validation via `System.ComponentModel.DataAnnotations`.
+
+---
+
+## P3: Future Platform Pillars
+
+### MEDI — `Microsoft.Extensions.DataIngestion`
+
+When the chunking/embedding pipeline needs formal structure (beyond the current ad-hoc feed → embed → store cycle), MEDI provides:
+- Document readers (PDF, HTML, Markdown)
+- Chunking strategies (token-based, section-based, sliding window)
+- Enrichment transformations (summarization, keyword extraction)
+- Built on MEAI + MEVD
+
+### System.Numerics.Tensors
+
+`Tensor<T>` (experimental in .NET 9) provides:
+- Multi-dimensional tensor operations
+- Zero-copy interop with ML.NET, TorchSharp, ONNX Runtime
+- Efficient data manipulation with indexing and slicing
+
+Already using `TensorPrimitives.CosineSimilarity` — worth monitoring `Tensor<T>` as it matures.
+
+### MCP — Model Context Protocol
+
+When SignalFlow capabilities need to cross process or product boundaries, expose them as MCP servers.
 
 ---
 
@@ -580,16 +339,16 @@ Extract to a generic `JobRequest<TConfig>` record as part of the job infrastruct
 
 | Phase | What | Why Now |
 |---|---|---|
-| **1** | `ClassificationSource` enum | Required by any AI feature; trivial extraction |
-| **1** | `ClassificationResult` / `ClassificationDecision` / `NeighborStats` to core models | Required by any AI feature; zero dependencies |
-| **1** | `EmbeddingSerializer` utility | Required by any vector feature |
-| **2** | `IVectorStore` + `InMemoryVectorStore` abstraction | Core AI primitive; needed by pgvector, similarity search |
-| **2** | `IEmbeddingService` abstraction | Core AI primitive; needed by every AI pipeline |
+| **1** | `ClassificationSource` enum | Required by any AI feature; trivial |
+| **1** | Core classification records to `WorkplaceIQ.AI.Models` | Required by any AI feature; zero deps |
+| **1** | `EmbeddingSerializer` to `WorkplaceIQ.AI.Utilities` | Required by any vector feature |
 | **2** | `ICentroidTracker` + `InMemoryCentroidTracker` | Needed for classification quality |
-| **3** | `VectorClassifier` as strategy pattern | Flagship AI feature; proves the above abstractions work |
-| **3** | `IFeedbackService` → split + extract | Production feedback loop |
-| **4** | Job infrastructure (`JobQueue`, `JobRunner`, progress adapter) | Background processing for any AI or non-AI pipeline |
-| **5** | Connector patterns (`RssConnector`, `IContentConnector`) | Reusable content ingestion |
-| **5** | Configuration pattern (`IFeatureConfiguration`) | Replaces ad-hoc parsing across all features |
+| **2** | MEVD provider swap (pgvector) | Production vector store |
+| **2** | MEAI embedding config (truncation, retry) | Production hardening |
+| **3** | `VectorClassifier` as strategy pattern | Flagship AI feature; proves abstractions |
+| **3** | `IFeedbackService` split + extract | Production feedback loop |
+| **4** | Job infrastructure (`JobQueue`, `JobRunner`) | Background processing for any pipeline |
+| **5** | Connector patterns (`IContentConnector`) | Reusable content ingestion |
+| **5** | Configuration pattern (`IFeatureConfiguration`) | Replaces ad-hoc parsing |
 
-> **Bottom line:** The SignalFlow implementation contains ~3,000 lines of production-tested code that can be systematically extracted into WorkplaceIQ's platform. The P0 and P1 items are the highest-value extractions — they form the foundation for every AI feature the platform will support.
+> **Bottom line:** SignalFlow contains ~3,000 lines of production-tested code built directly on MEAI + MEVD. Extractions add configuration, provider portability, and shared models — not new abstractions. The P0 and P1 items form the foundation for every AI feature the platform will support.

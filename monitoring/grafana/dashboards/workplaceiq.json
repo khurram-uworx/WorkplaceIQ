@@ -1,0 +1,30 @@
+{
+  "title": "WorkplaceIQ Overview",
+  "uid": "workplaceiq-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "title": "Active Requests",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_count[1m])",
+          "legendFormat": "rate"
+        }
+      ]
+    },
+    {
+      "title": "Request Duration",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_sum[1m]) / rate(http_server_requests_seconds_count[1m])",
+          "legendFormat": "avg"
+        }
+      ]
+    }
+  ]
+}
