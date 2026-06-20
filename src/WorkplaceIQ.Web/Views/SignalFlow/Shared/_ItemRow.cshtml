@@ -1,0 +1,38 @@
+@using WorkplaceIQ.Content
+@using WorkplaceIQ.Labels
+@model ClassifiedItem
+@{
+    var item = Model;
+}
+<div class="iq-signalflow__item-card mb-2">
+    <div class="iq-signalflow__item-card__body" onclick="location.href='@Url.Action("Item", new { id = item.Id })'">
+        <div>
+            @if (item.IsNoise)
+            {
+                <span class="text-warning">&#9888; Noise</span>
+            }
+            else if (item.SignalLabel is not null)
+            {
+                <span class="iq-signalflow__item-card__signal" style="background:@item.SignalLabel.Color;color:#fff">
+                    &#128193; @item.SignalLabel.Name
+                </span>
+            }
+            <span class="iq-signalflow__item-card__time">@item.ClassifiedAt.ToLocalTime().ToString("g")</span>
+        </div>
+        <div style="flex:1">
+            <div class="iq-signalflow__item-card__title">@item.RssItem?.Title</div>
+            @if (!string.IsNullOrEmpty(item.Reasoning))
+            {
+                <div class="iq-signalflow__item-card__reasoning">@item.Reasoning</div>
+            }
+        </div>
+    </div>
+    <div class="iq-signalflow__item-card__actions">
+        <button class="btn btn-outline-primary btn-sm" data-iq-action="reclassify" data-iq-item-id="@item.Id" title="Reclassify">&#9998;</button>
+        @if (item.IsNoise)
+        {
+            <button class="btn btn-outline-success btn-sm" data-iq-action="mark-not-noise" data-iq-item-id="@item.Id" title="Mark not noise">&#10003;</button>
+        }
+        <button class="btn btn-outline-warning btn-sm" data-iq-action="retry" data-iq-item-id="@item.Id" title="Retry">&#8635;</button>
+    </div>
+</div>

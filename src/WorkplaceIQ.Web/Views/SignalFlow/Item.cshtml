@@ -1,0 +1,81 @@
+@using WorkplaceIQ.Content
+@using WorkplaceIQ.Labels
+@{
+    Layout = "_SignalFlowLayout";
+    var item = Model as ClassifiedItem;
+    var similar = ViewData["SimilarItems"] as List<(ClassifiedItem Item, double Score)> ?? [];
+    ViewData["Title"] = item?.RssItem?.Title ?? "Item Details";
+}
+
+<a asp-action="Index" class="btn btn-outline-secondary btn-sm mb-3">&larr; Back</a>
+
+@if (item is null)
+{
+    <partial name="Shared/_EmptyState" model='@("Item not found.")' />
+}
+else
+{
+    <div class="iq-signalflow__item-detail">
+        <h3>@item.RssItem?.Title</h3>
+        <div class="iq-meta-row">
+            <span>Signal: <strong>@item.SignalLabel?.Name</strong></span>
+            <span>Classified: @item.ClassifiedAt.ToLocalTime().ToString("g")</span>
+            <span>Source: @item.ClassificationSource</span>
+            @if (item.IsNoise) { <span class="text-warning">Noise</span> }
+            @if (item.AttemptCount > 0) { <span>Attempts: @item.AttemptCount</span> }
+        </div>
+
+        @if (!string.IsNullOrEmpty(item.Reasoning))
+        {
+            <div class="mb-3">
+                <div class="iq-label">Reasoning</div>
+                <p class="mb-0">@item.Reasoning</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(item.HallucinatedSignal))
+        {
+            <div class="mb-3">
+                <div class="iq-label">Hallucinated Signal</div>
+                <p class="text-warning mb-0">@item.HallucinatedSignal</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(item.RssItem?.Body))
+        {
+            <div class="mb-3">
+                <div class="iq-label">Summary</div>
+                <p class="mb-0">@item.RssItem.Body</p>
+            </div>
+        }
+
+        <div class="iq-item-actions">
+            <button class="btn btn-outline-primary btn-sm" data-iq-action="reclassify" data-iq-item-id="@item.Id" title="Reclassify">&#9998; Reclassify</button>
+            @if (item.IsNoise)
+            {
+                <button class="btn btn-outline-success btn-sm" data-iq-action="mark-not-noise" data-iq-item-id="@item.Id" title="Mark not noise">&#10003; Mark Not Noise</button>
+            }
+            <button class="btn btn-outline-warning btn-sm" data-iq-action="retry" data-iq-item-id="@item.Id" title="Retry">&#8635; Retry</button>
+        </div>
+    </div>
+
+    @if (similar.Count > 0)
+    {
+        <hr />
+        <h5 class="mb-3">Similar Items</h5>
+        @foreach (var (sItem, score) in similar)
+        {
+            <div class="iq-signalflow__item-card mb-2" onclick="location.href='@Url.Action("Item", new { id = sItem.Id })'">
+                <div>
+                    <span class="iq-signalflow__item-card__signal" style="background:@(sItem.SignalLabel?.Color ?? "#e9ecef");color:#fff">
+                        @sItem.SignalLabel?.Name ?? "Unknown"
+                    </span>
+                    <span class="iq-similarity-score">@(score.ToString("P1"))</span>
+                </div>
+                <div style="flex:1">
+                    <div class="iq-signalflow__item-card__title">@sItem.RssItem?.Title</div>
+                </div>
+            </div>
+        }
+    }
+}

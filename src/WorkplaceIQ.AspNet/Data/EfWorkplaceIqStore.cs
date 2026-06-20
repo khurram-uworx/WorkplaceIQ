@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Runtime.CompilerServices;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
@@ -358,6 +359,137 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
         dbContext.Labels.Add(label);
         await dbContext.SaveChangesAsync(cancellationToken);
         return label;
+    }
+
+    // ----- Label queries -----
+
+    public Task<Label?> GetLabelByNameAsync(
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Labels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.NormalizedName == name.ToLowerInvariant(), cancellationToken);
+    }
+
+    public async Task<Label> CreateLabelAsync(
+        Label label,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.Labels.Add(label);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return label;
+    }
+
+    // ----- Classification queries -----
+
+    public Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.ClassifiedItems
+            .AsNoTrackingWithIdentityResolution()
+            .Include(item => item.RssItem)
+            .Include(item => item.SignalLabel)
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+    }
+
+    public Task<ClassifiedItem?> GetClassifiedByContentIdAsync(
+        Guid contentId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.ClassifiedItems
+            .AsNoTrackingWithIdentityResolution()
+            .Include(item => item.RssItem)
+            .Include(item => item.SignalLabel)
+            .FirstOrDefaultAsync(item => item.ContentId == contentId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ClassifiedItem>> GetClassifiedItemsByLabelAsync(
+        Guid labelId,
+        int offset = 0,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var items = await dbContext.ClassifiedItems
+            .AsNoTrackingWithIdentityResolution()
+            .Include(item => item.RssItem)
+            .Include(item => item.SignalLabel)
+            .Where(item => item.LabelId == labelId)
+            .ToListAsync(cancellationToken);
+
+        return items
+            .OrderByDescending(item => item.ClassifiedAt)
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(
+        int limit = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var items = await dbContext.ClassifiedItems
+            .AsNoTrackingWithIdentityResolution()
+            .Include(item => item.RssItem)
+            .Include(item => item.SignalLabel)
+            .Where(item => !item.IsNoise)
+            .ToListAsync(cancellationToken);
+
+        return items
+            .OrderByDescending(item => item.ClassifiedAt)
+            .Take(limit)
+            .ToList();
+    }
+
+    public async Task<ClassifiedItem> CreateClassifiedItemAsync(
+        ClassifiedItem item,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.ClassifiedItems.Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return item;
+    }
+
+    public async Task<ClassifiedItem> UpdateClassifiedItemAsync(
+        ClassifiedItem item,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.ClassifiedItems.Update(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return item;
+    }
+
+    public async Task<Dictionary<Guid, int>> GetSignalCountsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ClassifiedItems
+            .GroupBy(item => item.LabelId)
+            .Select(group => new { LabelId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(g => g.LabelId, g => g.Count, cancellationToken);
+    }
+
+    public async IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
+        int limit,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var classifiedContentIds = await dbContext.ClassifiedItems
+            .Select(item => item.ContentId)
+            .ToListAsync(cancellationToken);
+
+        var items = await dbContext.Contents
+            .AsNoTracking()
+            .Include(c => c.ContentLabels)
+                .ThenInclude(cl => cl.Label)
+            .Where(c => c.Status != "archived")
+            .Where(c => !classifiedContentIds.Contains(c.Id))
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in items.OrderByDescending(c => c.CreatedAt))
+        {
+            yield return item;
+        }
     }
 
     public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(

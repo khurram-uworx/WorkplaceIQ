@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
@@ -19,6 +20,8 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
     public List<ContentRelationship> ContentRelationships { get; } = [];
 
     public List<MetricDefinition> MetricDefinitions { get; } = [];
+
+    public List<ClassifiedItem> ClassifiedItems { get; } = [];
 
     public Task<Content.Content?> GetContentByNameAsync(
         string name,
@@ -313,6 +316,114 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         };
         Labels.Add(label);
         return label;
+    }
+
+    // ----- Label queries -----
+
+    public Task<Label?> GetLabelByNameAsync(
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Labels.FirstOrDefault(l =>
+            string.Equals(l.NormalizedName, name, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    public Task<Label> CreateLabelAsync(
+        Label label,
+        CancellationToken cancellationToken = default)
+    {
+        Labels.Add(label);
+        return Task.FromResult(label);
+    }
+
+    // ----- Classification queries -----
+
+    public Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(ClassifiedItems.FirstOrDefault(item => item.Id == id));
+    }
+
+    public Task<ClassifiedItem?> GetClassifiedByContentIdAsync(
+        Guid contentId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(ClassifiedItems.FirstOrDefault(item => item.ContentId == contentId));
+    }
+
+    public Task<IReadOnlyList<ClassifiedItem>> GetClassifiedItemsByLabelAsync(
+        Guid labelId,
+        int offset = 0,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<ClassifiedItem>>(
+            ClassifiedItems
+                .Where(item => item.LabelId == labelId)
+                .OrderByDescending(item => item.ClassifiedAt)
+                .Skip(offset)
+                .Take(limit)
+                .ToList());
+    }
+
+    public Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(
+        int limit = 20,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<ClassifiedItem>>(
+            ClassifiedItems
+                .Where(item => !item.IsNoise)
+                .OrderByDescending(item => item.ClassifiedAt)
+                .Take(limit)
+                .ToList());
+    }
+
+    public Task<ClassifiedItem> CreateClassifiedItemAsync(
+        ClassifiedItem item,
+        CancellationToken cancellationToken = default)
+    {
+        ClassifiedItems.Add(item);
+        return Task.FromResult(item);
+    }
+
+    public Task<ClassifiedItem> UpdateClassifiedItemAsync(
+        ClassifiedItem item,
+        CancellationToken cancellationToken = default)
+    {
+        var index = ClassifiedItems.FindIndex(c => c.Id == item.Id);
+        if (index >= 0)
+        {
+            ClassifiedItems[index] = item;
+        }
+        return Task.FromResult(item);
+    }
+
+    public Task<Dictionary<Guid, int>> GetSignalCountsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(
+            ClassifiedItems
+                .GroupBy(item => item.LabelId)
+                .ToDictionary(g => g.Key, g => g.Count()));
+    }
+
+    public async IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
+        int limit,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var classifiedIds = new HashSet<Guid>(ClassifiedItems.Select(item => item.ContentId));
+        var unclassified = Contents
+            .Where(c => c.Status != "archived")
+            .Where(c => !classifiedIds.Contains(c.Id))
+            .OrderByDescending(c => c.CreatedAt)
+            .Take(limit)
+            .ToList();
+
+        foreach (var item in unclassified)
+        {
+            yield return item;
+        }
     }
 
     public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
