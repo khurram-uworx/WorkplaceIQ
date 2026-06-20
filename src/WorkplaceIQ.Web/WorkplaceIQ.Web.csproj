@@ -3,6 +3,13 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
+    <PackageReference Include="OpenAI" Version="2.*" />
+    <PackageReference Include="Streamix" Version="1.2.2" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.3.0" />
+    <PackageReference Include="Streamix.AspNetCore" Version="1.2.2" />
+    <PackageReference Include="Streamix.Extensions" Version="1.2.2-alpha" />
 
     <ProjectReference Include="..\WorkplaceIQ\WorkplaceIQ.csproj" />
     <ProjectReference Include="..\WorkplaceIQ.AspNet\WorkplaceIQ.AspNet.csproj" />
@@ -14,5 +21,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="configs/**/*.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
 </Project>

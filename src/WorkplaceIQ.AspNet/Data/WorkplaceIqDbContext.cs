@@ -26,6 +26,8 @@ public sealed class WorkplaceIqDbContext(DbContextOptions<WorkplaceIqDbContext> 
 
     public DbSet<MetricDefinition> MetricDefinitions => Set<MetricDefinition>();
 
+    public DbSet<ClassifiedItem> ClassifiedItems => Set<ClassifiedItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Content.Content>(entity =>
@@ -137,6 +139,27 @@ public sealed class WorkplaceIqDbContext(DbContextOptions<WorkplaceIqDbContext> 
         modelBuilder.Entity<MetricDefinition>(entity =>
         {
             entity.HasIndex(m => m.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ClassifiedItem>(entity =>
+        {
+            entity.HasIndex(item => item.LabelId);
+            entity.HasIndex(item => item.ContentId);
+            entity.HasIndex(item => item.ClassificationSource);
+            entity.HasIndex(item => item.ClassifiedAt);
+
+            entity
+                .HasOne(item => item.RssItem)
+                .WithMany()
+                .HasForeignKey(item => item.ContentId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity
+                .HasOne(item => item.SignalLabel)
+                .WithMany()
+                .HasForeignKey(item => item.LabelId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

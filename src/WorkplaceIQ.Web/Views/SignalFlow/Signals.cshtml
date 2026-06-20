@@ -1,0 +1,35 @@
+@using WorkplaceIQ.Web.SignalFlow.Models
+@{
+    Layout = "_SignalFlowLayout";
+    var groups = Model as List<SignalGroup> ?? [];
+    ViewData["Title"] = "Signals";
+}
+
+<h2 class="mb-3">Signals</h2>
+
+@if (groups.Count == 0)
+{
+    <partial name="Shared/_EmptyState" model='@("No signals yet.")' />
+}
+else
+{
+    var idx = 0;
+    @foreach (var group in groups)
+    {
+        <details class="iq-signalflow__signal-group mb-2" @(idx++ == 0 ? "open" : "")>
+            <summary class="iq-signalflow__signal-group__header">
+                <span class="iq-signalflow__signal-group__name">@group.Signal</span>
+                <span class="badge bg-secondary rounded-pill">@group.Count</span>
+            </summary>
+            <div class="iq-signalflow__signal-group__items mt-2">
+                @foreach (var gItem in group.Items.Take(5))
+                {
+                    <partial name="Shared/_ItemRow" model="gItem" />
+                }
+                <a asp-action="Signal" asp-route-signalName="@group.Signal" class="btn btn-outline-secondary btn-sm mt-1">
+                    View all @group.Count items &rarr;
+                </a>
+            </div>
+        </details>
+    }
+}

@@ -1,0 +1,22 @@
+@using WorkplaceIQ.Content
+@{
+    Layout = "_SignalFlowLayout";
+    var items = Model as List<ClassifiedItem> ?? [];
+    ViewData["Title"] = "Noise";
+}
+
+<a asp-action="Index" class="btn btn-outline-secondary btn-sm mb-3">&larr; Back</a>
+
+<h2 class="mb-3">Noise (@items.Count)</h2>
+
+@if (items.Count == 0)
+{
+    <partial name="Shared/_EmptyState" model='@("No noise items.")' />
+}
+else
+{
+    @foreach (var item in items)
+    {
+        <partial name="Shared/_ItemRow" model="item" />
+    }
+}

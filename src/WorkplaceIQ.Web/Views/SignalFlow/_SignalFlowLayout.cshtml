@@ -1,0 +1,86 @@
+@inject WorkplaceIQ.Web.SignalFlow.Services.IFeedbackService FeedbackService
+@inject WorkplaceIQ.IWorkplaceIqStore Store
+@{
+    Layout = "_Layout";
+    var signalCounts = new List<WorkplaceIQ.Web.SignalFlow.Models.SignalCountItem>();
+    var labelCounts = await FeedbackService.GetSignalCountsAsync();
+    foreach (var (name, count) in labelCounts)
+    {
+        var label = await Store.GetLabelByNameAsync(name);
+        if (label is not null)
+            signalCounts.Add(new WorkplaceIQ.Web.SignalFlow.Models.SignalCountItem(label.Id, name, count));
+    }
+    var noiseCount = await FeedbackService.GetNoiseCountAsync();
+    var bouncedCount = await FeedbackService.GetFailedCountAsync();
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/signalflow.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+}
+
+<div class="row">
+    <aside class="iq-signalflow__sidebar col-md-3">
+        <h5>Signals</h5>
+        <ul class="nav flex-column">
+            @foreach (var item in signalCounts.OrderByDescending(s => s.Count))
+            {
+                <li class="nav-item">
+                    <a class="nav-link" asp-action="Signal" asp-route-signalName="@item.Name">
+                        <span>&#128193; @item.Name</span>
+                        <span class="badge bg-secondary rounded-pill">@item.Count</span>
+                    </a>
+                </li>
+            }
+        </ul>
+        <hr />
+        <a class="nav-link" asp-action="Noise">&#9888; Noise (@noiseCount)</a>
+        <a class="nav-link" asp-action="Bounced">&#8635; Bounced (@bouncedCount)</a>
+    </aside>
+    <main class="col-md-9">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="iq-signalflow__page-title">@ViewData["Title"]</h2>
+            <div class="iq-signalflow__pipeline-status">
+                <span id="iq-pipeline-status">Idle</span>
+                <button id="iq-run-pipeline" class="btn btn-primary btn-sm">Run Pipeline</button>
+            </div>
+        </div>
+        <div id="iq-pipeline-progress" class="iq-signalflow__progress" style="display:none">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div id="iq-pipeline-log" class="iq-signalflow__log"></div>
+        </div>
+        @RenderBody()
+    </main>
+</div>
+
+<!-- Reclassification Modal -->
+<div class="modal fade" id="iqReclassifyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reclassify Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="iq-reclassify-item-id" />
+                <div class="mb-3">
+                    <label for="iq-reclassify-signal" class="form-label">&#128193; New Signal</label>
+                    <select id="iq-reclassify-signal" class="form-select"></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="iq-reclassify-noise-btn">&#9888; Mark as Noise</button>
+                <button type="button" class="btn btn-primary" id="iq-reclassify-confirm">&#9998; Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8/dist/browser/signalr.min.js"></script>
+    <script src="~/js/signalflow.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+}

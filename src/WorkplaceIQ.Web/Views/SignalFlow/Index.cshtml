@@ -1,0 +1,20 @@
+@{
+    Layout = "_SignalFlowLayout";
+    ViewData["Title"] = "SignalFlow";
+    var recent = ViewData["RecentItems"] as IReadOnlyList<ClassifiedItem> ?? [];
+}
+
+@if (recent.Count == 0)
+{
+    <partial name="Shared/_EmptyState" model='@("No classified items yet. Run the pipeline to fetch and classify RSS feeds.")' />
+}
+else
+{
+    <h5 class="mb-3">Recently Classified</h5>
+    <div id="iq-recent-items">
+    @foreach (var item in recent)
+    {
+        <partial name="Shared/_ItemRow" model="item" />
+    }
+    </div>
+}

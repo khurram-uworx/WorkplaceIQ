@@ -8,6 +8,56 @@ namespace WorkplaceIQ;
 
 public interface IWorkplaceIqStore
 {
+    // Label queries
+
+    Task<Label?> GetLabelByNameAsync(
+        string name,
+        CancellationToken cancellationToken = default);
+
+    Task<Label> CreateLabelAsync(
+        Label label,
+        CancellationToken cancellationToken = default);
+
+    // Classification queries
+
+    Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<ClassifiedItem?> GetClassifiedByContentIdAsync(
+        Guid contentId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ClassifiedItem>> GetClassifiedItemsByLabelAsync(
+        Guid labelId,
+        int offset = 0,
+        int limit = 50,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(
+        int limit = 20,
+        CancellationToken cancellationToken = default);
+
+    Task<ClassifiedItem> CreateClassifiedItemAsync(
+        ClassifiedItem item,
+        CancellationToken cancellationToken = default);
+
+    Task<ClassifiedItem> UpdateClassifiedItemAsync(
+        ClassifiedItem item,
+        CancellationToken cancellationToken = default);
+
+    Task<Dictionary<Guid, int>> GetSignalCountsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task DeleteClassifiedItemAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
+        int limit,
+        CancellationToken cancellationToken = default);
+
+    // Existing queries below
     Task<Content.Content?> GetContentByNameAsync(
         string name,
         CancellationToken cancellationToken = default);
