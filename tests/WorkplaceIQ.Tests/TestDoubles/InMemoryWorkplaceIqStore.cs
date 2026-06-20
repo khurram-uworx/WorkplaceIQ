@@ -408,6 +408,14 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
                 .ToDictionary(g => g.Key, g => g.Count()));
     }
 
+    public Task DeleteClassifiedItemAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ClassifiedItems.RemoveAll(c => c.Id == id);
+        return Task.CompletedTask;
+    }
+
     public async IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
         int limit,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -415,6 +423,7 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
         var classifiedIds = new HashSet<Guid>(ClassifiedItems.Select(item => item.ContentId));
         var unclassified = Contents
             .Where(c => c.Status != "archived")
+            .Where(c => c.RetryCount < 5)
             .Where(c => !classifiedIds.Contains(c.Id))
             .OrderByDescending(c => c.CreatedAt)
             .Take(limit)

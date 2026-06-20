@@ -1,6 +1,5 @@
 using System.Numerics.Tensors;
 using WorkplaceIQ.Content;
-using WorkplaceIQ.Labels;
 using WorkplaceIQ.Web.SignalFlow.Models;
 
 namespace WorkplaceIQ.Web.SignalFlow.Services;
@@ -142,10 +141,25 @@ public class FeedbackService(
         if (item?.RssItem is null)
             return (false, null);
 
-        item.AttemptCount = 0;
-        item.HallucinatedSignal = null;
-        await store.UpdateClassifiedItemAsync(item, ct);
+        var content = item.RssItem;
+        if (content.RetryCount >= 5)
+            return (false, item);
 
-        return (true, item);
+        content.RetryCount++;
+        await store.UpdateContentAsync(content, ct);
+
+        if (content.RetryCount >= 5)
+        {
+            item.AttemptCount = content.RetryCount;
+            item.HallucinatedSignal = null;
+            await store.UpdateClassifiedItemAsync(item, ct);
+            return (true, item);
+        }
+
+        var deletedId = item.Id;
+        await store.DeleteClassifiedItemAsync(classifiedId, ct);
+        await vectorStore.RemoveAsync(content.Id, ct);
+
+        return (true, null);
     }
 }

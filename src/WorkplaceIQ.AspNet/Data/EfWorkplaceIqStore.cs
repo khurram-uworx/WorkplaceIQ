@@ -469,6 +469,19 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             .ToDictionaryAsync(g => g.LabelId, g => g.Count, cancellationToken);
     }
 
+    public async Task DeleteClassifiedItemAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.ClassifiedItems
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (item is not null)
+        {
+            dbContext.ClassifiedItems.Remove(item);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     public async IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
         int limit,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -482,6 +495,7 @@ public sealed class EfWorkplaceIqStore(WorkplaceIqDbContext dbContext) : IWorkpl
             .Include(c => c.ContentLabels)
                 .ThenInclude(cl => cl.Label)
             .Where(c => c.Status != "archived")
+            .Where(c => c.RetryCount < 5)
             .Where(c => !classifiedContentIds.Contains(c.Id))
             .Take(limit)
             .ToListAsync(cancellationToken);

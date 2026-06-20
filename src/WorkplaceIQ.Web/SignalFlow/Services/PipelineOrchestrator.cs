@@ -1,5 +1,4 @@
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
 using Streamix;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
@@ -208,7 +207,7 @@ public class PipelineOrchestrator(
                         Interlocked.Increment(ref failedCount);
                     }
 
-                    await PersistResultAsync(work.Content, work.Embedding, decision, innerCt);
+                    await PersistResultAsync(work.Content, work.Embedding, decision, attemptCount, innerCt);
                     Interlocked.Increment(ref processed);
 
                     progress.Report(new PipelineItemProcessed(
@@ -282,6 +281,7 @@ public class PipelineOrchestrator(
         Content.Content content,
         ReadOnlyMemory<float> embedding,
         ClassificationDecision decision,
+        int attemptCount,
         CancellationToken ct)
     {
         var label = await EnsureLabelAsync(decision.Result.Signal, ct);
@@ -292,7 +292,7 @@ public class PipelineOrchestrator(
             LabelId = label.Id,
             Reasoning = decision.Result.Reasoning,
             IsNoise = decision.Result.IsNoise,
-            AttemptCount = 0,
+            AttemptCount = attemptCount,
             HallucinatedSignal = decision.Result.HallucinatedSignal,
             Embedding = embedding.IsEmpty ? null : EmbeddingSerializer.ToBytes(embedding),
             ClassificationSource = decision.Source,

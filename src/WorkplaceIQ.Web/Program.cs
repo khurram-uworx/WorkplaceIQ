@@ -6,9 +6,9 @@ using System.ClientModel;
 using WorkplaceIQ.AspNet;
 using WorkplaceIQ.AspNet.Data;
 using WorkplaceIQ.AspNet.Files;
-using WorkplaceIQ.Web.SignalFlow.Services;
 using WorkplaceIQ.Web;
 using WorkplaceIQ.Web.Hubs;
+using WorkplaceIQ.Web.SignalFlow.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

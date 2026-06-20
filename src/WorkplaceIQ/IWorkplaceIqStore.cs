@@ -49,6 +49,10 @@ public interface IWorkplaceIqStore
     Task<Dictionary<Guid, int>> GetSignalCountsAsync(
         CancellationToken cancellationToken = default);
 
+    Task DeleteClassifiedItemAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
     IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
         int limit,
         CancellationToken cancellationToken = default);

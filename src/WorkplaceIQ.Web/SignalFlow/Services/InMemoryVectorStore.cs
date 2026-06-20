@@ -43,6 +43,20 @@ public sealed class InMemoryVectorStore : IVectorStore
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask<bool> RemoveAsync(Guid rssItemId, CancellationToken ct = default)
+    {
+        lock (gate)
+        {
+            var idx = entries.FindIndex(e => e.RssItemId == rssItemId);
+            if (idx >= 0)
+            {
+                entries.RemoveAt(idx);
+                return ValueTask.FromResult(true);
+            }
+        }
+        return ValueTask.FromResult(false);
+    }
+
     public async IAsyncEnumerable<(VectorIndexEntry Record, double Score)> SearchAsync(
         ReadOnlyMemory<float> embedding, int topK, [EnumeratorCancellation] CancellationToken ct = default)
     {

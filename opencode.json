@@ -5,15 +5,15 @@
       "type": "remote",
       "url": "https://learn.microsoft.com/api/mcp"
     },
-    "memori": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@uworx/memori",
-        "--markdown"
-      ]
-    },
+    //"memori": {
+    //  "type": "local",
+    //  "command": [
+    //    "npx",
+    //    "-y",
+    //    "@uworx/memori",
+    //    "--markdown"
+    //  ]
+    //},
     "code-memory": {
       "type": "local",
       "command": [

@@ -66,9 +66,10 @@ public sealed class PipelineHub(
         await feedbackService.MarkNotNoiseAsync(id, Context.ConnectionAborted);
     }
 
-    public async Task RetryItem(string itemId)
+    public async Task<bool> RetryItem(string itemId)
     {
-        if (!Guid.TryParse(itemId, out var id)) return;
-        await feedbackService.RetryFailedAsync(id, Context.ConnectionAborted);
+        if (!Guid.TryParse(itemId, out var id)) return false;
+        var (success, _) = await feedbackService.RetryFailedAsync(id, Context.ConnectionAborted);
+        return success;
     }
 }

@@ -50,6 +50,8 @@ public sealed class Content
 
     public string? SettingsJson { get; set; }
 
+    public int RetryCount { get; set; }
+
     public bool IsSystemGenerated { get; set; }
 
     public string? MetadataJson { get; set; }

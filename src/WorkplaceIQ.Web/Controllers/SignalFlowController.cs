@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using WorkplaceIQ.Content;
 using WorkplaceIQ.Web.SignalFlow.Models;
 using WorkplaceIQ.Web.SignalFlow.Services;
 

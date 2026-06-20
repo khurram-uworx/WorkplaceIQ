@@ -11,8 +11,10 @@
 else
 {
     <h5 class="mb-3">Recently Classified</h5>
+    <div id="iq-recent-items">
     @foreach (var item in recent)
     {
         <partial name="Shared/_ItemRow" model="item" />
     }
+    </div>
 }

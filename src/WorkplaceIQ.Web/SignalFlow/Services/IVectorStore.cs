@@ -9,6 +9,7 @@ public interface IVectorStore
     ValueTask UpsertBatchAsync(IEnumerable<VectorIndexEntry> entries, CancellationToken ct = default);
     IAsyncEnumerable<(VectorIndexEntry Record, double Score)> SearchAsync(
         ReadOnlyMemory<float> embedding, int topK, CancellationToken ct = default);
+    ValueTask<bool> RemoveAsync(Guid rssItemId, CancellationToken ct = default);
     ValueTask<IReadOnlyList<VectorIndexEntry>> GetAllAsync(CancellationToken ct = default);
     ValueTask ClearAsync(CancellationToken ct = default);
 }

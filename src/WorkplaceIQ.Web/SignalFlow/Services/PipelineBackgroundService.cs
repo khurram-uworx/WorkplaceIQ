@@ -1,7 +1,7 @@
-using System.Threading.Channels;
 using Microsoft.AspNetCore.SignalR;
-using WorkplaceIQ.Web.SignalFlow.Models;
+using System.Threading.Channels;
 using WorkplaceIQ.Web.Hubs;
+using WorkplaceIQ.Web.SignalFlow.Models;
 
 namespace WorkplaceIQ.Web.SignalFlow.Services;
 
