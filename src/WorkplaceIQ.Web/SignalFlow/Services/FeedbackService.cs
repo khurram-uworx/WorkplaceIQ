@@ -1,4 +1,4 @@
-using System.Numerics.Tensors;
+using Microsoft.Extensions.VectorData;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Web.SignalFlow.Models;
 
@@ -6,8 +6,9 @@ namespace WorkplaceIQ.Web.SignalFlow.Services;
 
 public class FeedbackService(
     IWorkplaceIqStore store,
-    IVectorStore vectorStore) : IFeedbackService
+    VectorStoreCollection<string, SignalFlowVectorEntry> collection) : IFeedbackService
 {
+
     public async Task<List<SignalGroup>> GetSignalsAsync(CancellationToken ct = default)
     {
         var byLabel = await store.GetSignalCountsAsync(ct);
@@ -83,19 +84,31 @@ public class FeedbackService(
             return [];
 
         var targetVec = EmbeddingSerializer.FromBytes(target.Embedding);
-        var candidates = await store.GetRecentClassifiedItemsAsync(int.MaxValue, ct);
-        candidates = candidates.Where(c => c.Embedding is not null && c.Embedding.Length > 0 && c.Id != classifiedId).ToList();
+        await collection.EnsureCollectionExistsAsync(ct);
 
-        var scores = new List<(ClassifiedItem Item, double Score)>();
-        foreach (var c in candidates)
+        var options = new VectorSearchOptions<SignalFlowVectorEntry>
         {
-            if (c.Embedding is null || c.Embedding.Length == 0) continue;
-            var vec = EmbeddingSerializer.FromBytes(c.Embedding);
-            var sim = TensorPrimitives.CosineSimilarity(targetVec.Span, vec.Span);
-            scores.Add((c, sim));
+            Filter = e => !e.IsNoise,
+            IncludeVectors = false
+        };
+
+        var results = new List<(Guid ContentId, double Score)>();
+        await foreach (var result in collection.SearchAsync<ReadOnlyMemory<float>>(targetVec, top + 1, options, ct))
+        {
+            if (result.Record.Id == classifiedId.ToString()) continue;
+            results.Add((Guid.Parse(result.Record.Id), result.Score ?? 0));
+            if (results.Count >= top) break;
         }
 
-        return scores.OrderByDescending(x => x.Score).Take(top).ToList();
+        var items = new List<(ClassifiedItem Item, double Score)>();
+        foreach (var (contentId, score) in results)
+        {
+            var item = await store.GetClassifiedItemByIdAsync(contentId, ct);
+            if (item is not null)
+                items.Add((item, score));
+        }
+
+        return items;
     }
 
     public async Task<Dictionary<string, int>> GetSignalCountsAsync(CancellationToken ct = default)
@@ -158,7 +171,9 @@ public class FeedbackService(
 
         var deletedId = item.Id;
         await store.DeleteClassifiedItemAsync(classifiedId, ct);
-        await vectorStore.RemoveAsync(content.Id, ct);
+
+        if (await collection.CollectionExistsAsync(ct))
+            await collection.DeleteAsync(content.Id.ToString(), ct);
 
         return (true, null);
     }

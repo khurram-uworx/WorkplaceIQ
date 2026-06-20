@@ -3,11 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using System.ClientModel;
+using Microsoft.Extensions.VectorData;
+using Microsoft.SemanticKernel.Connectors.InMemory;
 using WorkplaceIQ.AspNet;
 using WorkplaceIQ.AspNet.Data;
 using WorkplaceIQ.AspNet.Files;
 using WorkplaceIQ.Web;
 using WorkplaceIQ.Web.Hubs;
+using WorkplaceIQ.Web.SignalFlow.Models;
 using WorkplaceIQ.Web.SignalFlow.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,16 +29,41 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(
         Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys")));
 
-var connectionString = builder.Configuration.GetConnectionString("WorkplaceIQ");
-if (!string.IsNullOrEmpty(connectionString) && connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+// Storage:Provider selects the EF Core provider.
+// Supported: sqlite, pgvector, sqlserver, inmemory.
+// Connection strings are read from the matching key under ConnectionStrings.
+var provider = builder.Configuration.GetValue<string>("Storage:Provider") ?? "sqlite";
+
+var connectionString = provider.ToLowerInvariant() switch
 {
-    builder.Services.AddWorkplaceIqAspNet(options =>
-        options.UseNpgsql(connectionString));
-}
-else
+    "sqlite" => builder.Configuration.GetConnectionString("Sqlite")
+        ?? "Data Source=App_Data/workplaceiq.db;Pooling=False",
+    "pgvector" => builder.Configuration.GetConnectionString("Npgsql")
+        ?? builder.Configuration.GetConnectionString("PgVector"),
+    "sqlserver" => builder.Configuration.GetConnectionString("SqlServer"),
+    "inmemory" => null,
+    var p => throw new InvalidOperationException(
+        $"Unsupported storage provider '{p}'. Supported: sqlite, pgvector, sqlserver, inmemory")
+};
+
+switch (provider.ToLowerInvariant())
 {
-    builder.Services.AddWorkplaceIqAspNet(options =>
-        options.UseSqlite(connectionString ?? "Data Source=workplaceiq.db;Pooling=False"));
+    case "sqlite":
+        builder.Services.AddWorkplaceIqAspNet(options =>
+            options.UseSqlite(connectionString));
+        break;
+    case "pgvector":
+        builder.Services.AddWorkplaceIqAspNet(options =>
+            options.UseNpgsql(connectionString));
+        break;
+    case "sqlserver":
+        builder.Services.AddWorkplaceIqAspNet(options =>
+            options.UseSqlServer(connectionString));
+        break;
+    case "inmemory":
+        builder.Services.AddWorkplaceIqAspNet(options =>
+            options.UseInMemoryDatabase("workplaceiq"));
+        break;
 }
 
 builder.Services.AddOpenTelemetry()
@@ -46,7 +74,19 @@ var sigConfig = new WorkplaceIQ.Web.SignalFlow.Models.PipelineConfig();
 builder.Configuration.GetSection("SignalFlow").Bind(sigConfig);
 builder.Services.AddSingleton(sigConfig);
 builder.Services.AddSingleton<CategoryCentroidTracker>();
-builder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>();
+
+// VectorStore provider dispatch — matches Storage:Provider used by EF Core above.
+var vectorStore = CreateVectorStore(provider);
+builder.Services.AddSingleton(vectorStore);
+
+// Build the typed collection once with the embedding dimension from config.
+// The dimension comes from engine.md → PipelineConfig.EmbeddingDimension (default 768).
+// If you change the embedding model, update engine.md accordingly.
+var collection = vectorStore.GetCollection<string, SignalFlowVectorEntry>(
+    SignalFlowVectorEntry.CollectionName,
+    SignalFlowVectorSchema.CreateEntryDefinition(sigConfig.EmbeddingDimension));
+builder.Services.AddSingleton(collection);
+
 builder.Services.AddSingleton<ConfigLoader>();
 builder.Services.AddScoped<IFeedbackService, FeedbackService>();
 builder.Services.AddScoped<PipelineOrchestrator>();
@@ -104,3 +144,16 @@ app.MapControllerRoute(
     .WithStaticAssets();
 
 app.Run();
+
+static VectorStore CreateVectorStore(string provider) => provider.ToLowerInvariant() switch
+{
+    "inmemory" => new InMemoryVectorStore(),
+    "sqlite" => throw new NotSupportedException(
+        "SQLite vector store requires the Microsoft.SemanticKernel.Connectors.SqliteVec package."),
+    "pgvector" => throw new NotSupportedException(
+        "pgvector vector store requires the Microsoft.SemanticKernel.Connectors.PgVector package."),
+    "sqlserver" => throw new NotSupportedException(
+        "SQL Server vector store requires the Microsoft.SemanticKernel.Connectors.SqlServer package."),
+    var p => throw new InvalidOperationException(
+        $"Unsupported vector store provider '{p}'. Supported: inmemory, sqlite, pgvector, sqlserver")
+};

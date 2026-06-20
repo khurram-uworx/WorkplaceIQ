@@ -1,0 +1,78 @@
+name: CD
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+    - name: Publish self-contained
+      run: dotnet publish src/WorkplaceIQ.Web/WorkplaceIQ.Web.csproj -c Release -r ${{ matrix.rid }} --self-contained true
+    - name: Zip publish output
+      shell: pwsh
+      run: |
+        $source = Resolve-Path "src/WorkplaceIQ.Web/bin/Release/net10.0/${{ matrix.rid }}/publish"
+        Compress-Archive -Path @(Get-ChildItem -Path $source | Select-Object -ExpandProperty FullName) -DestinationPath "workplace-iq-${{ matrix.rid }}.zip" -Force
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: workplace-iq-${{ matrix.rid }}
+        path: workplace-iq-${{ matrix.rid }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./release-artifacts
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: WorkplaceIQ ${{ github.ref_name }}
+        files: release-artifacts/**/*.zip
+        fail_on_unmatched_files: true
+
+  docker-push:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile
+        push: true
+        tags: |
+          ghcr.io/khurram-uworx/workplaceiq:latest
+          ghcr.io/khurram-uworx/workplaceiq:${{ github.ref_name }}

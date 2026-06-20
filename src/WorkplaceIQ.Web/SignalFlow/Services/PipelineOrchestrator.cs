@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.VectorData;
 using Streamix;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
@@ -13,9 +14,10 @@ public class PipelineOrchestrator(
     EmbeddingService embeddingService,
     IChatClient chatClient,
     CategoryCentroidTracker centroids,
-    IVectorStore vectorStore,
+    VectorStoreCollection<string, SignalFlowVectorEntry> collection,
     ILogger<PipelineOrchestrator> logger)
 {
+
     sealed record EmbeddedWork(
         Content.Content Content,
         RssItem RssItem,
@@ -49,7 +51,7 @@ public class PipelineOrchestrator(
             progress.Report(new PipelineProgress("Restore", 1, 1, "Vector store restored"));
 
             var classifier = new VectorClassifier(
-                vectorStore,
+                collection,
                 CreateLlmFallback(chatClient, systemPrompt, validSignals),
                 validSignals,
                 centroids,
@@ -115,7 +117,8 @@ public class PipelineOrchestrator(
                 $"Found {unprocessed.Count} items to classify"));
 
             // Stage 4 & 5: Embed + classify via Streamix Flux
-            var currentClassified = await vectorStore.CountAsync(innerCt);
+            var signalCounts = await store.GetSignalCountsAsync(innerCt);
+            var currentClassified = signalCounts.Sum(kvp => kvp.Value);
 
             await Flux.From<Content.Content>(unprocessed)
                 .Checkpoint("Embed")
@@ -256,6 +259,8 @@ public class PipelineOrchestrator(
 
     async Task RestoreVectorStateAsync(CancellationToken ct)
     {
+        await EnsureCollectionCreatedAsync(collection, ct);
+
         var labelCounts = await store.GetSignalCountsAsync(ct);
         foreach (var (labelId, _) in labelCounts)
         {
@@ -265,12 +270,14 @@ public class PipelineOrchestrator(
                 if (c.Embedding is null || c.Embedding.Length == 0) continue;
                 var emb = EmbeddingSerializer.FromBytes(c.Embedding);
                 centroids.AddOrUpdate(c.SignalLabel?.Name ?? "Unknown", emb);
-                await vectorStore.UpsertAsync(new VectorIndexEntry
+                await collection.UpsertAsync(new SignalFlowVectorEntry
                 {
-                    RssItemId = c.ContentId,
+                    Id = c.ContentId.ToString(),
                     Signal = c.SignalLabel?.Name ?? "Unknown",
                     Title = c.RssItem?.Title ?? string.Empty,
                     Summary = c.RssItem?.Body ?? string.Empty,
+                    IsNoise = c.IsNoise,
+                    ClassifiedAt = c.ClassifiedAt,
                     Embedding = emb
                 }, ct);
             }
@@ -302,17 +309,25 @@ public class PipelineOrchestrator(
 
         if (!embedding.IsEmpty)
         {
-            await vectorStore.UpsertAsync(new VectorIndexEntry
+            await collection.UpsertAsync(new SignalFlowVectorEntry
             {
-                RssItemId = content.Id,
+                Id = content.Id.ToString(),
                 Signal = decision.Result.Signal,
                 Title = content.Title,
                 Summary = content.Body ?? string.Empty,
+                IsNoise = decision.Result.IsNoise,
+                ClassifiedAt = DateTimeOffset.UtcNow,
                 Embedding = embedding
             }, ct);
 
             centroids.AddOrUpdate(decision.Result.Signal, embedding);
         }
+    }
+
+    static async Task EnsureCollectionCreatedAsync(
+        VectorStoreCollection<string, SignalFlowVectorEntry> collection, CancellationToken ct)
+    {
+        await collection.EnsureCollectionExistsAsync(ct);
     }
 
     async Task<Label> EnsureLabelAsync(string name, CancellationToken ct)

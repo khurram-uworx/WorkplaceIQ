@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.VectorData;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Web.SignalFlow.Models;
 
@@ -15,7 +16,7 @@ public sealed class VectorClassifier
     public const double DefaultMinAvgSimilarity = 0.86;
     public const double DefaultMinMargin = 0.10;
 
-    readonly IVectorStore store;
+    readonly VectorStoreCollection<string, SignalFlowVectorEntry> collection;
     readonly LlmFallbackDelegate llmFallback;
     readonly HashSet<string> validSignals;
     readonly CategoryCentroidTracker? centroids;
@@ -28,7 +29,7 @@ public sealed class VectorClassifier
     readonly double minMargin;
 
     public VectorClassifier(
-        IVectorStore store,
+        VectorStoreCollection<string, SignalFlowVectorEntry> collection,
         LlmFallbackDelegate llmFallback,
         IEnumerable<string> validSignals,
         CategoryCentroidTracker? centroids = null,
@@ -39,11 +40,12 @@ public sealed class VectorClassifier
         double minAvgSimilarity = DefaultMinAvgSimilarity,
         double minMargin = DefaultMinMargin)
     {
-        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(collection);
         ArgumentNullException.ThrowIfNull(llmFallback);
         ArgumentNullException.ThrowIfNull(validSignals);
 
-        this.store = store;
+        this.collection = collection;
+
         this.llmFallback = llmFallback;
         this.validSignals = new HashSet<string>(validSignals, StringComparer.OrdinalIgnoreCase);
         if (this.validSignals.Count == 0)
@@ -61,7 +63,7 @@ public sealed class VectorClassifier
     }
 
     public static VectorClassifier Create(
-        IVectorStore store,
+        VectorStoreCollection<string, SignalFlowVectorEntry> collection,
         IChatClient chatClient,
         string systemPrompt,
         IEnumerable<string> validSignals,
@@ -72,7 +74,7 @@ public sealed class VectorClassifier
         ArgumentException.ThrowIfNullOrEmpty(systemPrompt);
 
         return new VectorClassifier(
-            store,
+            collection,
             (item, ct) => RssClassifier.ClassifyAsync(chatClient, item, systemPrompt, ct),
             validSignals,
             centroids,
@@ -99,10 +101,17 @@ public sealed class VectorClassifier
             };
         }
 
-        var hits = new List<(string Signal, double Score)>(topK);
-        await foreach (var hit in store.SearchAsync(embedding, topK, ct).ConfigureAwait(false))
+        await collection.EnsureCollectionExistsAsync(ct).ConfigureAwait(false);
+
+        var options = new VectorSearchOptions<SignalFlowVectorEntry>
         {
-            hits.Add((hit.Record.Signal, hit.Score));
+            Filter = e => !e.IsNoise
+        };
+
+        var hits = new List<(string Signal, double Score)>(topK);
+        await foreach (var result in collection.SearchAsync<ReadOnlyMemory<float>>(embedding, topK, options, ct).ConfigureAwait(false))
+        {
+            hits.Add((result.Record.Signal, result.Score ?? 0));
             if (hits.Count >= topK) break;
         }
 
