@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
-using OpenAI;
-using System.ClientModel;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Connectors.InMemory;
-using Microsoft.SemanticKernel.Connectors.SqliteVec;
 using Microsoft.SemanticKernel.Connectors.PgVector;
+using Microsoft.SemanticKernel.Connectors.SqliteVec;
 using Microsoft.SemanticKernel.Connectors.SqlServer;
+using OpenAI;
+using System.ClientModel;
 using WorkplaceIQ.AspNet;
 using WorkplaceIQ.AspNet.Data;
 using WorkplaceIQ.AspNet.Files;

@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using WorkplaceIQ.Content;
 
 namespace WorkplaceIQ.AspNet.Data.Configurations;
 
