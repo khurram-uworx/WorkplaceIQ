@@ -71,13 +71,17 @@ public class ClassificationServiceTests
 
         await store.UpsertClassifiedItemAsync(new ClassifiedItem
         {
-            ContentId = contentA.Id, LabelId = label.Id,
-            ClassificationSource = "Test", ClassifiedAt = DateTime.UtcNow
+            ContentId = contentA.Id,
+            LabelId = label.Id,
+            ClassificationSource = "Test",
+            ClassifiedAt = DateTime.UtcNow
         });
         await store.UpsertClassifiedItemAsync(new ClassifiedItem
         {
-            ContentId = contentB.Id, LabelId = label.Id,
-            ClassificationSource = "Test", ClassifiedAt = DateTime.UtcNow
+            ContentId = contentB.Id,
+            LabelId = label.Id,
+            ClassificationSource = "Test",
+            ClassifiedAt = DateTime.UtcNow
         });
 
         Assert.That(store.ClassifiedItems, Has.Count.EqualTo(2));

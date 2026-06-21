@@ -83,7 +83,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
             {
                 item.Title = title.Trim();
                 item.Body = body?.Trim();
-                item.UpdatedAt = DateTimeOffset.UtcNow;
+                item.UpdatedAt = DateTime.UtcNow;
                 await store.UpdateContentAsync(item);
             }
         }

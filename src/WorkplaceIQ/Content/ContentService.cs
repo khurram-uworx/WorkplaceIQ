@@ -26,7 +26,7 @@ public sealed class ContentService(IWorkplaceIqStore store) : IContentService
         string? metadataJson = null,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var item = new Content
         {
             ParentId = parentId,
@@ -59,7 +59,7 @@ public sealed class ContentService(IWorkplaceIqStore store) : IContentService
         if (body is not null) item.Body = body.Trim();
         if (status is not null) item.Status = status.Trim();
         if (metadataJson is not null) item.MetadataJson = metadataJson;
-        item.UpdatedAt = DateTimeOffset.UtcNow;
+        item.UpdatedAt = DateTime.UtcNow;
 
         return await store.UpdateContentAsync(item, cancellationToken);
     }

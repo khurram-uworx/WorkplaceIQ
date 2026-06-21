@@ -104,7 +104,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         }
 
         content.Status = "archived";
-        content.UpdatedAt = DateTimeOffset.UtcNow;
+        content.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -166,7 +166,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
             AuthorUserId = authorUserId,
             IsSystemGenerated = isSystemGenerated,
             MetadataJson = metadataJson,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow
         };
 
         db.Posts.Add(post);
@@ -184,7 +184,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
                     Name = labelName.Name,
                     NormalizedName = labelName.NormalizedName,
                     Slug = labelName.Slug,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = DateTime.UtcNow
                 };
                 db.Labels.Add(label);
             }
@@ -374,7 +374,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
             Name = labelName.Name,
             NormalizedName = labelName.NormalizedName,
             Slug = labelName.Slug,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow
         };
         db.Labels.Add(label);
         await db.SaveChangesAsync(cancellationToken);

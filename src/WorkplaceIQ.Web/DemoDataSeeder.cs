@@ -64,7 +64,7 @@ internal static class DemoDataSeeder
                     NormalizedName = normalized,
                     Slug = name.ToLowerInvariant().Replace(' ', '-'),
                     Color = color,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = DateTime.UtcNow
                 });
             }
         }
@@ -178,7 +178,7 @@ internal static class DemoDataSeeder
         var existingIncidentContent = await store.GetChildrenAsync(incidentsContainer.Id);
         foreach (var (title, severity, duration, machine, location, shift, ago) in incidents)
         {
-            var createdAt = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(-ago), TimeSpan.Zero);
+            var createdAt = DateTime.UtcNow.Date.AddDays(-ago);
             var metadata = $"{{\"durationSeconds\":{duration},\"machineId\":\"{machine}\",\"location\":\"{location}\",\"shift\":\"{shift}\",\"severity\":\"{severity}\"}}";
             var name = title.ToLowerInvariant().Replace(' ', '-');
             var existing = existingIncidentContent.FirstOrDefault(item => item.Name == name);

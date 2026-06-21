@@ -34,7 +34,7 @@ public sealed class Post
 
     public string? MetadataJson { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<PostLabel> PostLabels { get; set; } = [];
 }

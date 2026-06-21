@@ -50,7 +50,7 @@ public sealed class FileComponentService(
 
         await storage.EnsureBucketAsync(cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var content = new Content.Content
         {
             ParentId = container.Id,

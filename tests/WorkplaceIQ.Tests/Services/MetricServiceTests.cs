@@ -17,8 +17,8 @@ public class MetricServiceTests
             ContentType = ContentTypes.FeedContainer,
             Title = "Factory Power Outages"
         });
-        AddContentItem(store, container.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
-        AddContentItem(store, container.Id, "Policy", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
+        AddContentItem(store, container.Id, "Outage", createdAt: DateTime.UtcNow.AddDays(-1));
+        AddContentItem(store, container.Id, "Policy", createdAt: DateTime.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
 
         var result = await service.ComputeAsync(new MetricRequest(
@@ -45,8 +45,8 @@ public class MetricServiceTests
             ContentType = ContentTypes.FeedContainer,
             Title = "Factory Power Outages"
         });
-        AddContentItem(store, container.Id, "Outage", durationSeconds: 3600, createdAt: DateTimeOffset.UtcNow.AddDays(-1));
-        AddContentItem(store, container.Id, "Outage", durationSeconds: 7200, createdAt: DateTimeOffset.UtcNow.AddDays(-1));
+        AddContentItem(store, container.Id, "Outage", durationSeconds: 3600, createdAt: DateTime.UtcNow.AddDays(-1));
+        AddContentItem(store, container.Id, "Outage", durationSeconds: 7200, createdAt: DateTime.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
 
         var result = await service.ComputeAsync(new MetricRequest(
@@ -87,10 +87,10 @@ public class MetricServiceTests
             ContentType = ContentTypes.ForumContainer,
             Title = "Maintenance Forum"
         });
-        AddContentItem(store, factory.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
-        AddContentItem(store, factory.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-2));
-        AddContentItem(store, office.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
-        AddContentItem(store, forum.Id, "Outage", createdAt: DateTimeOffset.UtcNow.AddDays(-1));
+        AddContentItem(store, factory.Id, "Outage", createdAt: DateTime.UtcNow.AddDays(-1));
+        AddContentItem(store, factory.Id, "Outage", createdAt: DateTime.UtcNow.AddDays(-2));
+        AddContentItem(store, office.Id, "Outage", createdAt: DateTime.UtcNow.AddDays(-1));
+        AddContentItem(store, forum.Id, "Outage", createdAt: DateTime.UtcNow.AddDays(-1));
         var service = CreateMetricService(store);
 
         var series = await service.ComputeSeriesAsync(new MetricRequest(
@@ -120,7 +120,7 @@ public class MetricServiceTests
         Guid containerId,
         string contentType,
         double durationSeconds = 0,
-        DateTimeOffset? createdAt = null)
+        DateTime? createdAt = null)
     {
         store.Contents.Add(new Content.Content
         {
@@ -129,7 +129,7 @@ public class MetricServiceTests
             Name = Guid.NewGuid().ToString("N"),
             Title = contentType,
             Status = "published",
-            CreatedAt = createdAt ?? DateTimeOffset.UtcNow,
+            CreatedAt = createdAt ?? DateTime.UtcNow,
             MetadataJson = $$"""{"durationSeconds": {{durationSeconds}}}"""
         });
     }

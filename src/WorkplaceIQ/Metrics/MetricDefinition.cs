@@ -35,5 +35,5 @@ public sealed class MetricDefinition
     [MaxLength(256)]
     public string? Description { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

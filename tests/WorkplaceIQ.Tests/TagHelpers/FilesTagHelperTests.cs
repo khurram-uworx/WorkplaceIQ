@@ -31,7 +31,7 @@ public class FilesTagHelperTests
                         Id = contentId,
                         Title = "Leave Policy",
                         Body = "Annual leave rules",
-                        UpdatedAt = new DateTimeOffset(2026, 6, 18, 0, 0, 0, TimeSpan.Zero),
+                        UpdatedAt = new DateTime(2026, 6, 18, 0, 0, 0).ToUniversalTime(),
                         ContentLabels =
                         [
                             new ContentLabel

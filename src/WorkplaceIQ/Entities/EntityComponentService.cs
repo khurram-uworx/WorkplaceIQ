@@ -63,7 +63,7 @@ public sealed class EntityComponentService(
             throw new InvalidOperationException($"Entity list '{listId}' does not exist.");
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var entity = new Content.Content
         {
             ParentId = container.Id,

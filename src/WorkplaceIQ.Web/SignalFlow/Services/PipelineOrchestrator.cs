@@ -341,7 +341,7 @@ public class PipelineOrchestrator(
             NormalizedName = name.ToLowerInvariant(),
             Slug = name.ToLowerInvariant().Replace(' ', '-'),
             Color = "#6c757d",
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow
         };
         return await store.CreateLabelAsync(label, ct);
     }

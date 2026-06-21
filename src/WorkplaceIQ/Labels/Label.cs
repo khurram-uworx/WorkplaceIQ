@@ -25,7 +25,7 @@ public sealed class Label
     [MaxLength(256)]
     public string? Description { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<PostLabel> PostLabels { get; set; } = [];
 }

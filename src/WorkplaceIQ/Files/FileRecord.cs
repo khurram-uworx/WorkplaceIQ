@@ -38,7 +38,7 @@ public sealed class FileRecord
     [MaxLength(1024)]
     public string ObjectKey { get; set; } = string.Empty;
 
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
