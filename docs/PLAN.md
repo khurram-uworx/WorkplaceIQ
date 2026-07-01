@@ -1,148 +1,464 @@
-# Plan
+# PLAN: ADR 02 Domain Content Model Implementation
 
-> What's built (Done) and what's coming (Coming Up).
+## Overview
 
----
+Refactor the monolithic `Content` class into a **table-per-type (TPT)** polymorphic hierarchy: a shared `Content` base table, per-container-type tables (`DiscussionContents`, `FolderContents`, `FeedContents`, `GroupContents`), a `ContentItems` table for all child items (discriminator-based), and an optional child table `ContentFiles` for file storage metadata.
 
-## Done
-
-### Core Model
-
-- **Content** — `Content` entity with unique `Name`, hierarchical parent/children, `ContentType` discriminator, `Status` lifecycle, `MetadataJson`, `SearchText`, timestamps. Self-referencing FK (`ParentId`) with restrict delete.
-- **Post** — `Post` entity with `PostType` (post/thread/comment), optional `ContentId` parent, `AuthorUserId`, `IsSystemGenerated`, `MetadataJson`. FKs to Contents with restrict delete.
-- **Label** — `Label` with `Name`, `NormalizedName` (unique), `Slug`, `Color`, `Description`. Many-to-many via `ContentLabels` and `PostLabels` join tables.
-- **ContentRelationship** — Directed relationship between two content items with `RelationshipType` string and `MetadataJson`.
-- **FileRecord** — 1-to-1 with Content: `FileName`, `ContentType`, `SizeBytes`, `ChecksumSha256`, `StorageProvider`, `BucketName`, `ObjectKey`.
-- **MetricDefinition** — Named metric with `ContainerType`, `InstrumentKind`, `Aggregation`, `SourceField`, `Unit`, `DisplayUnit`, `Description`.
-- **ContentTypes** constants — `FeedContainer`, `ForumContainer`, `FileContainer`, `EntityContainer`, `Directory`, `Dashboard`, `SystemFeed`, `KnowledgeBase`.
-- **PostTypes** constants — `Post`, `Thread`, `Comment`.
-
-### Business Concept Mapping
-
-Business concepts map to container types through which component service is called, not through configuration:
-
-| Concept | Service | Container Type | Children |
-|---------|---------|----------------|----------|
-| Feed / News / Incidents | `FeedComponentService` | `FeedContainer` | Content items + Posts |
-| Forum / Discussions | `ForumComponentService` | `ForumContainer` | Posts (type `thread`) |
-| File Library / Docs | `FileComponentService` | `FileContainer` | Content items + FileRecords |
-| Entity Directory | `EntityComponentService` | `EntityContainer` | Content items with user-defined ContentType |
-
-The component ID (e.g., `"CompanyNews"`, `"Machines"`) is the `Content.Name` lookup key. Each service hard-codes its `ContentTypes.*` constant. Container children use user-supplied ContentType strings (e.g., `"Outage"`, `"Machine"`, `"Team"`). Post type inference: replies with `contentId` → `Comment`, forum containers → `Thread`, otherwise → `Post`.
-
-### Data Access
-
-- `IWorkplaceIqStore` (97 lines) — CRUD for Content, Posts, Files, ContentRelationships, Labels, MetricDefinitions. All async with `CancellationToken`.
-- `EfWorkplaceIqStore` (371 lines) — Full EF Core implementation in `WorkplaceIQ.AspNet`.
-- `WorkplaceIqDbContext` — 8 DbSets (`Contents`, `Posts`, `Labels`, `PostLabels`, `ContentLabels`, `ContentRelationships`, `FileRecords`, `MetricDefinitions`). Unique indexes on `Name`/`NormalizedName`. FK constraints with `Restrict` delete. Database created via `EnsureCreated()`.
-
-### Component Services
-
-All services follow the same pattern: resolve a container by `Name`, auto-provision if missing (dev mode), return typed results. Auto-provisioning creates the container Content record with the hard-coded ContainerType as both ContentType and RendererKey. It does not auto-create APIs, permissions, AI indexes, search, or dashboards.
-
-- **FeedComponentService** — Resolves feed containers, returns posts + content items + labels. `CreatePostAsync()` with label parsing.
-- **ForumComponentService** — Thread-based posts. `CreateThreadAsync()` with initial post.
-- **FileComponentService** — File container resolution, file upload with `IFormFile`, labels, metadata.
-- **EntityComponentService** — Entity list/detail, entity creation with metadata/labels, relationships.
-- **ComponentService** — Generic container resolution used by all above.
-- **ContentService** — Thin wrapper over store for content CRUD with trimming.
-
-### Tag Helpers
-
-Six Tag Helpers registered via `@addTagHelper *, WorkplaceIQ.AspNet`. All use constructor injection, render semantic HTML with BEM-like classes, encode output via `HtmlEncoder`, and emit `data-*` attributes for JS interaction.
-
-| TagHelper | Attributes | Behavior |
-|-----------|------------|----------|
-| `FeedTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves feed container, renders posts/content with action buttons |
-| `ForumTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves forum container, renders threads |
-| `FilesTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves files container, renders file cards |
-| `EntityListTagHelper` | `id`, `title`, `type`, `system-managed`, `disable-*` | Resolves entity container, renders entity cards |
-| `EntityTagHelper` | `id`, `title`, `type`, `container` | Single entity detail with relationships |
-| `MetricTagHelper` | `name`, `source`, `content-type`, `source-field`, `window`, `unit`, `display-unit`, `container-type`, `container-id` | Builds `MetricRequest`, renders display value |
-
-Interaction controls: `disable-add`, `disable-edit`, `disable-delete`, `disable-comment`, `disable-label`. Use `system-managed` for auto-provisioning.
-
-### Metrics
-
-- `IMetricProvider` interface with `MetricRequest → MetricResult` pipeline.
-- 5 providers registered as singletons:
-  - `ContentCountMetricProvider` — `workplaceiq.container.content.count`
-  - `MetadataAggregationMetricProvider` × 4 — `workplaceiq.metadata.sum`, `.avg`, `.min`, `.max`
-- `IMetricService` — resolves providers by name, computes results, supports time windows.
-- OpenTelemetry integration via `"WorkplaceIQ"` meter.
-- Unit conversion (e.g., seconds → hours via `display-unit`).
-
-### File Storage
-
-- `IFileObjectStorage` — `EnsureBucket`, `Upload`, `OpenRead`, `Delete`.
-- `S3FileObjectStorage` — AWS SDK S3 implementation (compatible with MinIO).
-- `FileStorageOptions` — `Provider`, `Endpoint`, `BucketName`, `AccessKey`, `SecretKey`, `UseSsl`.
-- Auto-bucket creation: `EnsureBucketAsync()` checks existence via `DoesS3BucketExistV2Async`, creates via `PutBucketRequest` if missing. Called on every file upload.
-
-### Web App (Demo)
-
-- **Pages**: Dashboard (metrics cards + nav), News (posts with labels), Incidents (feed with metadata metrics), Discussions (threads with labels), Documents (file upload/download).
-- **Controllers**: `HomeController` (page views + CreateFeedPost/CreateForumThread POST), `ContentController` (AddComment/AddLabel/Edit/Delete POST), `FilesController` (Upload/Download).
-- **UI**: Bootstrap 5 + 770-line custom CSS design system (Inter font, BEM component classes, design tokens). Modal-based CRUD via `site.js`.
-- **Seeded data**: 14 labels with colors, 4 news posts, 3 forum threads, 2 entities with relationship, 12 incident content items with metadata, 2 metric definitions.
-- **JS interaction**: Single modal form (`#iqItemActionModal`) handles comment/add-label/edit/delete across all item types. `data-iq-action` / `data-iq-type` / `data-iq-id` attributes drive behavior.
-
-### Infrastructure
-
-- **Docker Compose** — `workplaceiq-web` (port 4792) + `minio` (ports 9000/9001) with named volumes.
-- **Dockerfile** — Multi-stage .NET 10 build.
-- **.NET Aspire** — `WorkplaceIQ.AppHost` orchestrates PostgreSQL + MinIO for development.
-- **CI** — GitHub Actions workflow in `.github/workflows/ci.yml`. Restore → Build → Test on .NET 10.
-- **Service defaults** — OpenTelemetry metrics/tracing, health checks, resilience pipelines, service discovery.
-
-### Tests
-
-25+ NUnit tests across 10 files:
-
-| Test File | Tests |
-|-----------|-------|
-| `FeedComponentServiceTests` | 11 — auto-provisioning, content items, production mode, missing ID, trimming, post creation, invalid input, label normalization |
-| `FileComponentServiceTests` | 4 — auto-provisioning, upload with labels, per-container filtering, stream readback |
-| `EntityComponentServiceTests` | 4 — auto-provisioning, metadata+labels, per-list filtering, relationships |
-| `ContentServiceTests` | 3 — create with trimming, parent-based filtering, missing content |
-| `MetricServiceTests` | 4 — content count with window, metadata sum + display unit, series across containers, unknown metric |
-| `FeedTagHelperTests` | 5 — rendering, empty state, XSS, content items, system-managed, disable attrs |
-| `ForumTagHelperTests` | 3 — rendering, empty, XSS |
-| `FilesTagHelperTests` | 3 — rendering, empty, XSS |
-| `EntityTagHelperTests` | 3 — entity list with relationships, XSS, empty |
-| `MetricTagHelperTests` | 2 — request building, display value rendering |
-
-Test doubles (`InMemoryWorkplaceIqStore`, `InMemoryFileObjectStorage`, recording wrappers, `TagHelperOutputFactory`, `TestHostEnvironment`) in `TestDoubles/`.
+Since we are 0.x, there is **no data migration** — we build the new schema from scratch. The old flat `Content` table and standalone `Post`/`FileRecord` entities are replaced entirely.
 
 ---
 
-## Coming Up
+## 1. Schema Design
 
-### AI & Intelligence
+> TPT inheritance (`UseTptMappingStrategy()`) **does not need an explicit Discriminator column** — EF Core infers the concrete type by which child table has a matching row. The `Discriminator` column is intentionally omitted from `Content`; the C# model likewise has no `Discriminator` property.
 
-- **Vector/Semantic Search** — Embed content, posts, and files. Store in pgvector, Azure AI Search, Qdrant, or Redis. Permission-aware retrieval. Hybrid (keyword + vector) search.
-- **AI Chat** — `<iq-ai-chat>` tag helper for RAG-based natural language querying across containers, feeds, forums, files, entities. Source-cited answers with follow-up suggestions. Metric querying via tools.
-- **Summaries & Digests** — Daily feed summaries, weekly department digests, content/thread/file summaries. Scheduled or on-demand. Stored as system posts with source references.
-- **Insights Engine** — Trend detection, anomaly identification, emerging topic discovery. Metric-driven insight templates. AI-generated explanations with severity, confidence, category, recommendation. Acknowledge/dismiss workflow.
+### 1.1 Content (shared base — one row per container)
 
-### UI Components
+| Column | Type | Notes |
+|---|---|---|
+| `Id` | `Guid` PK | |
+| `CreatedAt` | `DateTime` (UTC) | |
+| `CreatedBy` | `string(128)?` | |
+| `ModifiedAt` | `DateTime` (UTC) | |
+| `ModifiedBy` | `string(128)?` | |
 
-- **Dashboards** — `<iq-dashboard>` tag helper composing metric cards, trend charts, grouped breakdowns, recent activity, AI insights, natural language chart explanations.
-- **System-Generated Views** — Virtual containers from filters/rules/queries (e.g., "Last 7 Days Outages"). Behave like normal containers. Permission inheritance from source.
-- **Additional Tag Helpers** — `<iq-ai-chat>`, `<iq-ai-summary>`, `<iq-insights>`, `<iq-dashboard>`, `<iq-chart>`.
+Shared infrastructure via link tables (Id FK → Content.Id):
+- `ContentLabels` → `Label`
+- `ContentMetadata` → key/value
+- `ContentMetrics` → metric values
 
-### Platform Features
+### 1.2 Per-Container-Type Tables
 
-- **Permissions & Security** — Tenant isolation at data/search/vector/analytics levels. Container/content/post/field-level permissions. CRUD + comment + label + AI + metrics + insights actions. Scoped API access with service accounts.
-- **Multi-Tenant** — Isolated databases or shared with tenant filtering. Tenant-aware routing, search, vector indexing. Site management within tenants.
-- **Full-Text Search** — Keyword search across containers, metadata/label filters with facets, container-scoped and site-wide. Result types: containers, content, posts, files, comments, users, insights, metrics.
-- **Metadata Schemas** — Versioned field definitions per content type. Field types: string, number, integer, boolean, date, datetime, duration, choice, multi-choice, geo-location, json, references. Form generation, validation, analytics-driven schema.
-- **Knowledge Base** — Full `KnowledgeBase` container type with hierarchy, rich content, search, and AI chat.
+Each table has `Id = Guid PK/FK → Content.Id`.
 
-### Infrastructure & Ecosystem
+**DiscussionContents**
 
-- **Admin UI** — Container, schema, metric, and user management. Usage analytics and health monitoring.
-- **Custom Renderers & Container Types** — Pluggable renderers per container type. Custom metric providers, metadata field types, AI providers, vector stores.
-- **Audit Logging** — Track creation/modification of all entity types. External API writes. AI-generated artifact tracking.
-- **Deployment Templates** — Azure / on-premises. Helm charts, ARM/Bicep templates. Multi-region support.
-- **Component Marketplace** — Reusable intranet templates and custom components.
+| Column | Type | Notes |
+|---|---|---|
+| `Id` | `Guid` PK/FK | |
+| `BusinessId` | `int` | Application-managed (max+1 per container type) |
+| `Name` | `string(256)` | Unique, URL-safe slug |
+| `Title` | `string(256)` | Display title |
+| `Description` | `string?` | |
+| `VectorCollectionName` | `string?` | |
+| `RendererKey` | `string(128)?` | |
+| `Status` | `string(32)` | `active`, `archived` |
+| `SettingsJson` | `string?` | |
+| `IsSystemGenerated` | `bool` | |
+
+**FolderContents** (same structure)
+
+| Column | Type | Notes |
+|---|---|---|
+| `Id` | `Guid` PK/FK | |
+| `BusinessId` | `int` | Application-managed (max+1 per container type) |
+| `Name` | `string(256)` | |
+| `Title` | `string(256)` | |
+| `Description` | `string?` | |
+| `VectorCollectionName` | `string?` | |
+| `RendererKey` | `string(128)?` | |
+| `Status` | `string(32)` | |
+| `SettingsJson` | `string?` | |
+| `IsSystemGenerated` | `bool` | |
+
+**FeedContents** (same structure)
+
+**GroupContents** (same structure + GroupType)
+
+| Column | Type | Notes |
+|---|---|---|
+| ...same as above... | | |
+| `GroupType` | `string(128)?` | e.g., `Machine`, `Team` |
+
+### 1.3 ContentItems (all child items)
+
+| Column | Type | Notes |
+|---|---|---|
+| `Id` | `Guid` PK | **Standalone** — does NOT extend Content |
+| `ContainerId` | `Guid` FK → Content.Id | Parent container |
+| `Discriminator` | `string(32)` | `topic`, `feed_entry`, `file`, `member` |
+| `BusinessId` | `int` | Application-managed (max+1 per container) |
+| `Title` | `string(256)` | Post/discussion title, file name, member name |
+| `Body` | `string?` | Post body, file description, member description |
+| `AuthorUserId` | `string(128)?` | |
+| `Status` | `string(32)` | `active`, `archived` |
+| `PublishedAt` | `DateTime?` | |
+| `ContentData` | `string?` | Flexible payload for type-specific data (JSON text; native jsonb on PostgreSQL) |
+| `CreatedAt` | `DateTime` (UTC) | |
+| `CreatedBy` | `string(128)?` | |
+| `ModifiedAt` | `DateTime` (UTC) | |
+| `ModifiedBy` | `string(128)?` | |
+
+### 1.4 Optional Child Tables (extend ContentItems via Id FK)
+
+Only created when a discriminator needs typed columns beyond what `ContentData` (JSON text) provides.
+
+**ContentFiles** (for `discriminator = 'file'`)
+
+| Column | Type |
+|---|---|
+| `Id` | `Guid` PK/FK → ContentItems |
+| `FileName` | `string(512)` |
+| `ContentType` | `string(256)` |
+| `SizeBytes` | `long` |
+| `ChecksumSha256` | `string(128)?` |
+| `StorageProvider` | `string(64)` |
+| `BucketName` | `string(256)` |
+| `ObjectKey` | `string(1024)` |
+
+Discriminators without a child table (`topic`, `feed_entry`, `member`) store all type-specific data in `ContentItems.ContentData` (JSON text).
+
+---
+
+## 2. Domain Model (C# Classes)
+
+### Namespace `WorkplaceIQ.Content`
+
+```
+Content (abstract)
+├── Container (abstract)
+│   ├── DiscussionContent (sealed)
+│   ├── FolderContent (sealed)
+│   ├── FeedContent (sealed)
+│   └── GroupContent (sealed, +GroupType)
+├── ContentItem (concrete — discriminator-based, has Title/Body/etc.)
+└── ContentFile (sealed, 1:1 child of ContentItem — file storage metadata)
+```
+
+**Content.cs** — shared base:
+```csharp
+public abstract class Content
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? CreatedBy { get; set; }
+    public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
+    public string? ModifiedBy { get; set; }
+}
+```
+
+**Container.cs** — abstract, common container fields:
+```csharp
+public abstract class Container : Content
+{
+    public int BusinessId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? VectorCollectionName { get; set; }
+    public string? RendererKey { get; set; }
+    public string Status { get; set; } = "active";
+    public string? SettingsJson { get; set; }
+    public bool IsSystemGenerated { get; set; }
+    public ICollection<ContentItem> Items { get; set; } = [];
+}
+```
+
+Concrete containers: `DiscussionContent`, `FolderContent`, `FeedContent`, `GroupContent` (GroupContent adds `string? GroupType`).
+
+**ContentItem.cs** — concrete, discriminator-based, has common post fields:
+```csharp
+public class ContentItem
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ContainerId { get; set; }
+    public Container? Container { get; set; }
+    public string Discriminator { get; set; } = string.Empty;
+    public int BusinessId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Body { get; set; }
+    public string? AuthorUserId { get; set; }
+    public string Status { get; set; } = "active";
+    public DateTime? PublishedAt { get; set; }
+    public string? ContentData { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? CreatedBy { get; set; }
+    public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
+    public string? ModifiedBy { get; set; }
+    public ICollection<ContentItemLabel> Labels { get; set; } = [];
+}
+```
+
+**ContentFile.cs** (optional child of ContentItem — file storage metadata):
+```csharp
+public class ContentFile
+{
+    public Guid Id { get; set; }
+    public ContentItem? ContentItem { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = "application/octet-stream";
+    public long SizeBytes { get; set; }
+    public string? ChecksumSha256 { get; set; }
+    public string StorageProvider { get; set; } = string.Empty;
+    public string BucketName { get; set; } = string.Empty;
+    public string ObjectKey { get; set; } = string.Empty;
+}
+```
+
+### Namespace `WorkplaceIQ.Labels`
+
+- `ContentLabel` — link table (ContentId → Content.Id, LabelId → Label.Id) — unchanged shape but now FK to Content base
+- `ContentItemLabel` — new (ContentItemId → ContentItems.Id, LabelId → Label.Id) — for item-level labels
+- `Label` — unchanged
+- `PostLabel` — **removed** (replaced by `ContentItemLabel`)
+
+### Namespace `WorkplaceIQ.Metrics`
+
+- `ContentMetric` — link table (ContentId, MetricDefinitionId, Value, Timestamp)
+- `ContentItemMetric` — link table (ContentItemId, MetricDefinitionId, Value, Timestamp)
+- `ContentMetadata` — link table (ContentId, Key, Value) — replaces `Content.MetadataJson`
+- `ContentItemMetadata` — link table (ContentItemId, Key, Value) — replaces item-level JSON metadata
+
+---
+
+## 3. Data Access Layer
+
+### 3.1 DbContext (`WorkplaceIqDbContext`)
+
+- `DbSet<Content> Contents` — base table
+- `DbSet<DiscussionContent> DiscussionContents`
+- `DbSet<FolderContent> FolderContents`
+- `DbSet<FeedContent> FeedContents`
+- `DbSet<GroupContent> GroupContents`
+- `DbSet<ContentItem> ContentItems`
+- `DbSet<ContentFile> ContentFiles`
+- `DbSet<ContentLabel> ContentLabels`
+- `DbSet<ContentItemLabel> ContentItemLabels`
+- `DbSet<ContentMetric> ContentMetrics`
+- `DbSet<ContentItemMetric> ContentItemMetrics`
+- `DbSet<ContentMetadata> ContentMetadata`
+- `DbSet<ContentItemMetadata> ContentItemMetadata`
+
+### 3.2 Entity Configuration (TPT mapping)
+
+```csharp
+// ContentConfiguration: TPT base
+entity.UseTptMappingStrategy();
+
+// Container type configurations:
+// entity.ToTable("DiscussionContents");
+// entity.HasOne(d => (Content)d).WithOne().HasForeignKey<DiscussionContent>(d => d.Id);
+
+// ContentItemConfiguration
+entity.ToTable("ContentItems");
+// Container.Items → ContentItem.ContainerId FK:
+// entity.HasOne(ci => ci.Container).WithMany(c => c.Items).HasForeignKey(ci => ci.ContainerId);
+
+// ContentFileConfiguration
+entity.ToTable("ContentFiles");
+entity.HasOne(f => f.ContentItem).WithOne().HasForeignKey<ContentFile>(f => f.Id);
+```
+
+### 3.3 Store Interface (`IWorkplaceIqStore`)
+
+Replace flat Content CRUD with typed methods:
+
+```csharp
+// Container queries
+Task<T?> GetContainerByIdAsync<T>(Guid id, CancellationToken ct = default) where T : Container;
+Task<T?> GetContainerByNameAsync<T>(string name, CancellationToken ct = default) where T : Container;
+Task<T?> GetContainerByBusinessIdAsync<T>(int businessId, CancellationToken ct = default) where T : Container;
+Task<IReadOnlyList<T>> GetContainersByTypeAsync<T>(CancellationToken ct = default) where T : Container;
+Task<T> CreateContainerAsync<T>(T container, CancellationToken ct = default) where T : Container;
+Task<T> UpdateContainerAsync<T>(T container, CancellationToken ct = default) where T : Container;
+Task DeleteContainerAsync(Guid id, CancellationToken ct = default);
+
+// ContentItem queries
+Task<ContentItem?> GetItemByIdAsync(Guid id, CancellationToken ct = default);
+Task<ContentItem?> GetItemByBusinessIdAsync(Guid containerId, int businessId, CancellationToken ct = default);
+Task<IReadOnlyList<ContentItem>> GetItemsByContainerAsync(Guid containerId, string? discriminator = null, CancellationToken ct = default);
+Task<ContentItem> CreateItemAsync(ContentItem item, CancellationToken ct = default);
+Task<ContentItem> UpdateItemAsync(ContentItem item, CancellationToken ct = default);
+Task DeleteItemAsync(Guid id, CancellationToken ct = default);
+
+// Child table queries
+Task<ContentFile?> GetContentFileByItemIdAsync(Guid itemId, CancellationToken ct = default);
+Task<ContentFile> CreateContentFileAsync(ContentFile file, CancellationToken ct = default);
+
+// Classification (preserve one-per-ContentItem invariant)
+Task<ClassifiedItem> UpsertClassifiedItemAsync(ClassifiedItem item, CancellationToken ct = default);
+// existing classification queries unchanged — ContentId now refers to ContentItem.Id
+
+// Labels, Metrics, Relationships — adapt FKs to new tables
+```
+
+### 3.4 Store Implementations
+
+- `EfWorkplaceIqStore` — rewrite from scratch for new schema
+- `InMemoryWorkplaceIqStore` — rewrite from scratch for test doubles
+
+---
+
+## 4. Service Layer Migration
+
+### 4.1 Component Services
+
+All component services (`FeedComponentService`, `ForumComponentService`, `FileComponentService`, `EntityComponentService`) currently return `ComponentResult` with `Content.Content? Container`. Change to return their typed container:
+
+| Service | Old | New |
+|---|---|---|
+| `FeedComponentService` | `Content?` | `FeedContent?` |
+| `ForumComponentService` | `Content?` | `DiscussionContent?` (Forum → DiscussionContent) |
+| `FileComponentService` | `Content?` | `FolderContent?` |
+| `EntityComponentService` | `Content?` | `GroupContent?` |
+
+The `ComponentService.ResolveAsync` method becomes type-aware — it creates the correct container type based on the requested type parameter.
+
+### 4.2 ContentService
+
+Currently works with flat `Content`. Split into:
+
+- `ContainerService` — CRUD for containers, vector collection management
+- `ContentItemService` — CRUD for items within a container
+
+Or keep as `ContentService` with overloaded methods. TBD during implementation.
+
+### 4.3 Metric Providers
+
+`MetricProviderBase.GetContainerItemsAsync` currently returns `(Content Container, IReadOnlyList<Content> Items)`. Change to `(Container Container, IReadOnlyList<ContentItem> Items)`.
+
+### 4.4 Classification / SignalFlow
+
+`ClassifiedItem.ContentId` currently refers to `Content.Id`. After refactoring, classification applies to `ContentItem` (not container). Change FK to `ContentItem.Id`. The one-per-content invariant becomes one-per-ContentItem.
+
+### 4.5 File Operations
+
+`FileComponentService.UploadAsync` currently creates a `Content` + `FileRecord`. Change to create a `ContentItem` (discriminator = `file`) + associated `ContentFile` child row.
+
+`FileObject` record currently wraps `Content.Content` + `FileRecord`. Change to `ContentItem` + `ContentFile`. `IFileObjectStorage` remains unchanged.
+
+---
+
+## 5. Web Layer Migration
+
+### 5.1 Controllers
+
+`ContentController` currently works with `itemType == "content"` vs `"post"`. Change to work with `ContentItem` directly:
+
+- `AddComment` → creates a `ContentItem` (discriminator = `topic`) under the same container
+- `AddLabel` → checks item type and adds to `ContentLabel` (container) or `ContentItemLabel` (item)
+- `Edit` → updates `ContentItem` directly (Title, Body, Status)
+- `Delete` → soft-deletes `ContentItem` or `Container`
+
+### 5.2 Tag Helpers
+
+Tag helper result types update their container reference:
+
+| Tag Helper | Old Container Type | New Container Type |
+|---|---|---|
+| `FeedTagHelper` | `Content?` | `FeedContent?` |
+| `ForumTagHelper` | `Content?` | `DiscussionContent?` |
+| `FilesTagHelper` | `Content?` | `FolderContent?` |
+| `EntityTagHelper` | `Content?` | `GroupContent?` |
+
+### 5.3 DemoDataSeeder
+
+Rewrite to use new model:
+- `FeedComponentService` → creates `FeedContent` container + `ContentItem` (feed_entry) items
+- `ForumComponentService` → creates `DiscussionContent` container + `ContentItem` (topic) with Title/Body on ContentItem
+- `EntityComponentService` → creates `GroupContent` container + `ContentItem` (member) items
+- Labels, metrics, incidents → use new models
+
+---
+
+## 6. Test Strategy
+
+### 6.1 InMemory Store
+
+Rewrite `InMemoryWorkplaceIqStore` to use typed lists:
+- `List<DiscussionContent> DiscussionContents`
+- `List<FolderContent> FolderContents`
+- `List<FeedContent> FeedContents`
+- `List<GroupContent> GroupContents`
+- `List<ContentItem> Items`
+- `List<ContentFile> ContentFiles`
+- `List<ContentLabel> ContentLabels`
+- `List<ContentItemLabel> ContentItemLabels`
+- etc.
+
+### 6.2 Existing Tests
+
+| Test File | Required Changes |
+|---|---|
+| `ContentServiceTests.cs` | Replace `Content.Content` with `ContentItem` |
+| `ClassificationServiceTests.cs` | Replace `Content.Content` with `ContentItem` |
+| `FeedComponentServiceTests.cs` | Use `FeedContent` container, `ContentItem` posts |
+| `ForumTagHelperTests.cs` | Use `DiscussionContent` container |
+| `FilesTagHelperTests.cs` | Use `FolderContent` container |
+| `EntityTagHelperTests.cs` | Use `GroupContent` container |
+| `MetricServiceTests.cs` | Update references |
+| `MetricTagHelperTests.cs` | Update references |
+
+---
+
+## 7. Implementation Order
+
+### Step 1 — Domain Model Types
+Create new files:
+- `Content/Content.cs` (abstract)
+- `Content/Container.cs` (abstract)
+- `Content/DiscussionContent.cs` (sealed)
+- `Content/FolderContent.cs` (sealed)
+- `Content/FeedContent.cs` (sealed)
+- `Content/GroupContent.cs` (sealed)
+- `Content/ContentItem.cs` (concrete, with Title/Body/etc.)
+- `Content/ContentFile.cs` (child — file storage metadata, replace Files/FileRecord.cs)
+- `Content/ContentLabel.cs` (update FK)
+- `Content/ContentItemLabel.cs` (new)
+- `Content/ContentMetadata.cs` (new)
+- `Content/ContentItemMetadata.cs` (new)
+- `Content/ContentMetric.cs` (new)
+- `Content/ContentItemMetric.cs` (new)
+- Remove old `Content/Content.cs`, `Content/ContentTypes.cs`, `Posts/Post.cs`, `Posts/PostTypes.cs`, `Files/FileRecord.cs`, `Labels/PostLabel.cs`, `Files/FileObject.cs`
+
+### Step 2 — EF Core + Configurations
+- Create `ContentConfiguration`, `DiscussionContentConfiguration`, `FolderContentConfiguration`, `FeedContentConfiguration`, `GroupContentConfiguration`
+- Create `ContentItemConfiguration`, `ContentFileConfiguration`
+- Create configurations for new link tables
+- Update `WorkplaceIqDbContext`
+
+### Step 3 — Store Interface + Implementations
+- Rewrite `IWorkplaceIqStore`
+- Rewrite `EfWorkplaceIqStore`
+- Rewrite `InMemoryWorkplaceIqStore`
+
+### Step 4 — Service Layer
+- Update `ContainerService`/`ContentItemService` (was `ContentService`)
+- Update `ComponentService` and all component services
+- Update metric providers
+- Update SignalFlow pipeline (classifier references)
+
+### Step 5 — Web Layer
+- Update `ContentController`
+- Update tag helpers (`FeedTagHelper`, `ForumTagHelper`, `FilesTagHelper`, `EntityTagHelper`, `EntityListTagHelper`)
+- Update `DemoDataSeeder`
+- Update renderers (`ComponentHtmlRenderer`, `LabelHtmlRenderer`)
+- Update views minimally (model type references)
+
+### Step 6 — Tests
+- Update all test files to use new model
+- Verify `dotnet test --configuration Release` passes
+
+### Step 7 — Verify No Obsolete Types Remain
+- Confirm all old types (`Content`, `ContentTypes`, `Post`, `PostTypes`, `FileRecord`, `PostLabel`, `FileContentTypes`, `FileObject`) have been removed in Step 1 and no stale references exist
+- `dotnet build` passes with zero obsolete-type warnings
+
+---
+
+## 8. Decisions Log
+
+| Question | Decision |
+|---|---|
+| Inheritance strategy | **TPT** — `Content` base table, per-concrete-type tables for containers (`DiscussionContents`, `FolderContents`, `FeedContents`, `GroupContents`). Separate `ContentItems` table (standalone, does NOT extend Content) with optional child table `ContentFiles` for file storage metadata. |
+| Container types | `DiscussionContent`, `FolderContent`, `FeedContent`, `GroupContent`. ForumContainer → DiscussionContent (with `RendererKey = "forum"`). EntityContainer → GroupContent. |
+| Item discriminators | `topic`, `feed_entry`, `file`, `member`. Title/Body/AuthorUserId live on `ContentItem` directly (most item types need them). |
+| `ContentFile` | Only child table — for discriminator `file`, holds file storage metadata. Formerly `FileRecord` in `WorkplaceIQ.Files` namespace. |
+| No `ContentTopics` child table | Discussion posts use Title/Body on `ContentItem`. Labels (via `ContentItemLabel`) serve as hashtags/topics for items. |
+| `FeedEntry` / `Member` | No child table — use `ContentData` (JSON text) for any type-specific extras. |
+| `ContentItem` extends `Content`? | **No** — standalone table with its own PK + ContainerId FK. Tradeoff: queries spanning containers + items (e.g., "all labeled Urgent") require two separate queries or a UNION. Acceptable for 2–50 person enterprises. |
+| `Post` / `PostLabel` | Removed — replaced by `ContentItem` + `ContentItemLabel` |
+| Data migration | **Not needed** — 0.x, clean slate |
+| C# class name for `Folders` table | `FolderContent` (table name `FolderContents`) |
+| Forum → DiscussionContent | ForumContainer becomes a `DiscussionContent` entry with `RendererKey = "forum"`. `ForumComponentService` wraps `DiscussionContent` queries. |
+| `ContentRelationship` | References `Content.Id` only (container-level). No item-level relationships for now. |
+| `ClassifiedItem.ContentId` | References `ContentItem.Id` (classification applies to items, not containers) |
