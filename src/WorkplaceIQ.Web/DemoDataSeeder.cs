@@ -17,6 +17,8 @@ internal static class DemoDataSeeder
         var feedService = services.GetRequiredService<IFeedComponentService>();
         var forumService = services.GetRequiredService<IForumComponentService>();
         var entityService = services.GetRequiredService<IEntityComponentService>();
+        var containerService = services.GetRequiredService<IContainerService>();
+        var contentItemService = services.GetRequiredService<IContentItemService>();
         var store = services.GetRequiredService<IWorkplaceIqStore>();
 
         var feed = await feedService.ResolveFeedAsync(new FeedComponentRequest(
@@ -73,8 +75,8 @@ internal static class DemoDataSeeder
         // --- Seed Company News Posts ---
         if (feed.Container is not null)
         {
-            var existingFeedCount = await dbContext.Posts
-                .CountAsync(post => post.ContainerId == feed.Container.Id);
+            var existingFeedCount = await dbContext.ContentItems
+                .CountAsync(item => item.ContainerId == feed.Container.Id);
 
             if (existingFeedCount == 0)
             {
@@ -100,8 +102,8 @@ internal static class DemoDataSeeder
         // --- Seed Engineering Forum Threads ---
         if (forum.Container is not null)
         {
-            var existingForumCount = await dbContext.Posts
-                .CountAsync(post => post.ContainerId == forum.Container.Id);
+            var existingForumCount = await dbContext.ContentItems
+                .CountAsync(item => item.ContainerId == forum.Container.Id);
 
             if (existingForumCount == 0)
             {
@@ -123,7 +125,7 @@ internal static class DemoDataSeeder
         // --- Seed Engineering Assets ---
         if (machines.Container is not null)
         {
-            var existingMachines = await store.GetChildrenAsync(machines.Container.Id);
+            var existingMachines = await store.GetItemsByContainerAsync(machines.Container.Id);
             if (existingMachines.Count == 0)
             {
                 var team = await entityService.CreateEntityAsync(new EntityCreateRequest(
@@ -148,13 +150,12 @@ internal static class DemoDataSeeder
         }
 
         // --- Seed Incidents Container + Content ---
-        var incidentsContainer = await store.GetContentByNameAsync("PowerOutages");
+        var incidentsContainer = await containerService.GetByNameAsync<Container>("PowerOutages");
         if (incidentsContainer is null)
         {
-            incidentsContainer = await store.CreateContentAsync(new Content.Content
+            incidentsContainer = await store.CreateContainerAsync(new FeedContent
             {
                 Name = "PowerOutages",
-                ContentType = ContentTypes.FeedContainer,
                 Title = "Recent Incidents"
             });
         }
@@ -175,7 +176,7 @@ internal static class DemoDataSeeder
             (title: "Routine backup verification", severity: "Low", duration: 900, machine: "Backup-Job", location: "us-east-1", shift: "Day", ago: 25),
         };
 
-        var existingIncidentContent = await store.GetChildrenAsync(incidentsContainer.Id);
+        var existingIncidentContent = await store.GetItemsByContainerAsync(incidentsContainer.Id);
         foreach (var (title, severity, duration, machine, location, shift, ago) in incidents)
         {
             var createdAt = DateTime.UtcNow.Date.AddDays(-ago);
@@ -185,22 +186,28 @@ internal static class DemoDataSeeder
 
             if (existing is null)
             {
-                var contentService = services.GetRequiredService<IContentService>();
-                existing = await contentService.CreateAsync(
-                    incidentsContainer.Id,
-                    "Outage",
-                    name,
-                    title,
-                    $"{severity}-severity incident affecting {machine} in {location} during {shift.ToLowerInvariant()} shift. Duration: {duration / 60} minutes.",
-                    authorUserId: "system",
-                    metadataJson: metadata);
+                existing = await contentItemService.CreateAsync(new ContentItem
+                {
+                    ContainerId = incidentsContainer.Id,
+                    Discriminator = "Outage",
+                    Name = name,
+                    Title = title,
+                    Body = $"{severity}-severity incident affecting {machine} in {location} during {shift.ToLowerInvariant()} shift. Duration: {duration / 60} minutes.",
+                    AuthorUserId = "system",
+                    ContentData = metadata,
+                    CreatedAt = createdAt,
+                    ModifiedAt = createdAt,
+                    PublishedAt = createdAt.AddMinutes(5)
+                });
             }
-
-            existing.CreatedAt = createdAt;
-            existing.UpdatedAt = createdAt;
-            existing.PublishedAt = createdAt.AddMinutes(5);
-            existing.MetadataJson = metadata;
-            await store.UpdateContentAsync(existing);
+            else
+            {
+                existing.CreatedAt = createdAt;
+                existing.ModifiedAt = createdAt;
+                existing.PublishedAt = createdAt.AddMinutes(5);
+                existing.ContentData = metadata;
+                await store.UpdateItemAsync(existing);
+            }
         }
 
         // --- Seed Metric Definitions ---

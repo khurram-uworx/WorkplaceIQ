@@ -4,12 +4,6 @@ using WorkplaceIQ.Tests.TestDoubles;
 
 namespace WorkplaceIQ.Tests.Services;
 
-/// <summary>
-/// Tests for the classification invariant: one ClassifiedItem per ContentId, last label wins.
-/// These tests serve as the regression safety net for ADR 02 (unified polymorphic content model).
-/// When Content is refactored into Container/ContentItem, these tests must still pass with the
-/// updated store implementation — they validate the behavioral contract, not the entity shape.
-/// </summary>
 public class ClassificationServiceTests
 {
     [Test]
@@ -17,15 +11,15 @@ public class ClassificationServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
 
-        var content = new Content.Content
+        var item = new ContentItem
         {
             Name = "test-item",
             Title = "Test",
             Body = "Test body",
-            ContentType = "RssItem",
+            Discriminator = "RssItem",
             Status = "active"
         };
-        await store.CreateContentAsync(content);
+        await store.CreateItemAsync(item);
 
         var labelA = new Label { Name = "A", NormalizedName = "a", Slug = "a" };
         var labelB = new Label { Name = "B", NormalizedName = "b", Slug = "b" };
@@ -34,7 +28,7 @@ public class ClassificationServiceTests
 
         var first = new ClassifiedItem
         {
-            ContentId = content.Id,
+            ContentId = item.Id,
             LabelId = labelA.Id,
             ClassificationSource = "Test",
             ClassifiedAt = DateTime.UtcNow
@@ -43,14 +37,14 @@ public class ClassificationServiceTests
 
         var second = new ClassifiedItem
         {
-            ContentId = content.Id,
+            ContentId = item.Id,
             LabelId = labelB.Id,
             ClassificationSource = "Test",
             ClassifiedAt = DateTime.UtcNow
         };
         await store.UpsertClassifiedItemAsync(second);
 
-        var result = await store.GetClassifiedByContentIdAsync(content.Id);
+        var result = await store.GetClassifiedByContentIdAsync(item.Id);
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.LabelId, Is.EqualTo(labelB.Id));
@@ -61,24 +55,24 @@ public class ClassificationServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
 
-        var contentA = new Content.Content { Name = "a", Title = "A", ContentType = "RssItem", Status = "active" };
-        var contentB = new Content.Content { Name = "b", Title = "B", ContentType = "RssItem", Status = "active" };
-        await store.CreateContentAsync(contentA);
-        await store.CreateContentAsync(contentB);
+        var itemA = new ContentItem { Name = "a", Title = "A", Discriminator = "RssItem", Status = "active" };
+        var itemB = new ContentItem { Name = "b", Title = "B", Discriminator = "RssItem", Status = "active" };
+        await store.CreateItemAsync(itemA);
+        await store.CreateItemAsync(itemB);
 
         var label = new Label { Name = "X", NormalizedName = "x", Slug = "x" };
         await store.CreateLabelAsync(label);
 
         await store.UpsertClassifiedItemAsync(new ClassifiedItem
         {
-            ContentId = contentA.Id,
+            ContentId = itemA.Id,
             LabelId = label.Id,
             ClassificationSource = "Test",
             ClassifiedAt = DateTime.UtcNow
         });
         await store.UpsertClassifiedItemAsync(new ClassifiedItem
         {
-            ContentId = contentB.Id,
+            ContentId = itemB.Id,
             LabelId = label.Id,
             ClassificationSource = "Test",
             ClassifiedAt = DateTime.UtcNow
@@ -93,8 +87,8 @@ public class ClassificationServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
 
-        var content = new Content.Content { Name = "test", Title = "Test", ContentType = "RssItem", Status = "active" };
-        await store.CreateContentAsync(content);
+        var item = new ContentItem { Name = "test", Title = "Test", Discriminator = "RssItem", Status = "active" };
+        await store.CreateItemAsync(item);
 
         var labelA = new Label { Name = "A", NormalizedName = "a", Slug = "a" };
         var labelB = new Label { Name = "B", NormalizedName = "b", Slug = "b" };
@@ -105,7 +99,7 @@ public class ClassificationServiceTests
         await store.UpsertClassifiedItemAsync(new ClassifiedItem
         {
             Id = originalId,
-            ContentId = content.Id,
+            ContentId = item.Id,
             LabelId = labelA.Id,
             ClassificationSource = "Test",
             ClassifiedAt = DateTime.UtcNow
@@ -114,13 +108,13 @@ public class ClassificationServiceTests
         await store.UpsertClassifiedItemAsync(new ClassifiedItem
         {
             Id = Guid.NewGuid(),
-            ContentId = content.Id,
+            ContentId = item.Id,
             LabelId = labelB.Id,
             ClassificationSource = "Test",
             ClassifiedAt = DateTime.UtcNow
         });
 
-        var result = await store.GetClassifiedByContentIdAsync(content.Id);
+        var result = await store.GetClassifiedByContentIdAsync(item.Id);
         Assert.That(result!.Id, Is.EqualTo(originalId));
     }
 }

@@ -17,17 +17,18 @@ public sealed class FileComponentService(
             new ComponentRequest(
                 request.Id,
                 request.Title ?? string.Empty,
-                ContentTypes.FileContainer,
+                "FileContainer",
                 request.AutoProvision,
                 "files"),
             cancellationToken);
 
-        var files = result.Container is null
+        var container = result.Container as FolderContent;
+        var files = container is null
             ? []
-            : await store.GetFilesByContainerAsync(result.Container.Id, cancellationToken);
+            : await GetFilesForContainerAsync(container.Id, cancellationToken);
 
         return new FileComponentResult(
-            result.Container,
+            container,
             files,
             result.Created,
             result.Missing,
@@ -41,39 +42,37 @@ public sealed class FileComponentService(
         var filesId = RequireValue(request.FilesId, "A files id is required.", nameof(request.FilesId));
         var fileName = Path.GetFileName(RequireValue(request.FileName, "A file name is required.", nameof(request.FileName)));
         if (request.SizeBytes <= 0)
-        {
             throw new ArgumentException("A non-empty file is required.", nameof(request.SizeBytes));
-        }
 
-        var container = await store.GetContentByNameAsync(filesId, cancellationToken)
+        var container = await store.GetContainerByNameAsync<FolderContent>(filesId, cancellationToken)
             ?? throw new InvalidOperationException($"Files library '{filesId}' does not exist.");
 
         await storage.EnsureBucketAsync(cancellationToken);
 
         var now = DateTime.UtcNow;
-        var content = new Content.Content
+        var item = new ContentItem
         {
-            ParentId = container.Id,
-            ContentType = FileContentTypes.File,
+            ContainerId = container.Id,
+            Discriminator = "file",
             Name = CreateContentName(fileName),
             Title = string.IsNullOrWhiteSpace(request.Title) ? fileName : request.Title.Trim(),
             Body = request.Description?.Trim(),
             AuthorUserId = request.AuthorUserId?.Trim(),
             CreatedAt = now,
-            UpdatedAt = now,
-            PublishedAt = now,
-            SearchText = fileName
+            ModifiedAt = now,
+            PublishedAt = now
         };
 
-        var createdContent = await store.CreateContentAsync(content, cancellationToken);
+        var createdItem = await store.CreateItemAsync(item, cancellationToken);
+
         foreach (var label in LabelName.ParseList(request.Labels))
         {
-            await store.AddLabelToContentAsync(createdContent.Id, label, cancellationToken);
+            await store.AddLabelToItemAsync(createdItem.Id, label, cancellationToken);
         }
 
         try
         {
-            var objectKey = CreateObjectKey(filesId, createdContent.Id, fileName);
+            var objectKey = CreateObjectKey(filesId, createdItem.Id, fileName);
             var stored = await storage.UploadAsync(
                 objectKey,
                 request.Content,
@@ -81,62 +80,76 @@ public sealed class FileComponentService(
                 request.SizeBytes,
                 cancellationToken);
 
-            var fileRecord = new FileRecord
+            var contentFile = new ContentFile
             {
-                ContentId = createdContent.Id,
+                Id = createdItem.Id,
                 FileName = fileName,
                 ContentType = NormalizeContentType(request.ContentType),
                 SizeBytes = request.SizeBytes,
                 ChecksumSha256 = stored.ChecksumSha256,
                 StorageProvider = stored.StorageProvider,
                 BucketName = stored.BucketName,
-                ObjectKey = stored.ObjectKey,
-                CreatedAt = now,
-                UpdatedAt = now
+                ObjectKey = stored.ObjectKey
             };
 
-            return await store.CreateFileRecordAsync(fileRecord, cancellationToken);
+            await store.CreateContentFileAsync(contentFile, cancellationToken);
+            return new FileObject(createdItem, contentFile);
         }
         catch
         {
-            await store.DeleteContentAsync(createdContent.Id, cancellationToken);
+            await store.DeleteItemAsync(createdItem.Id, cancellationToken);
             throw;
         }
     }
 
-    public Task<FileObject?> GetFileAsync(
-        Guid contentId,
+    public async Task<FileObject?> GetFileAsync(
+        Guid itemId,
         CancellationToken cancellationToken = default)
     {
-        return store.GetFileByContentIdAsync(contentId, cancellationToken);
+        var item = await store.GetItemByIdAsync(itemId, cancellationToken);
+        if (item is null) return null;
+
+        var file = await store.GetContentFileByItemIdAsync(itemId, cancellationToken);
+        if (file is null) return null;
+
+        return new FileObject(item, file);
     }
 
     public async Task<Stream> OpenReadAsync(
-        Guid contentId,
+        Guid itemId,
         CancellationToken cancellationToken = default)
     {
-        var file = await store.GetFileByContentIdAsync(contentId, cancellationToken)
-            ?? throw new InvalidOperationException($"File content '{contentId}' not found.");
+        var file = await store.GetContentFileByItemIdAsync(itemId, cancellationToken)
+            ?? throw new InvalidOperationException($"File content '{itemId}' not found.");
 
-        return await storage.OpenReadAsync(file.FileRecord, cancellationToken);
+        return await storage.OpenReadAsync(file, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<FileObject>> GetFilesForContainerAsync(
+        Guid containerId, CancellationToken cancellationToken)
+    {
+        var items = await store.GetItemsByContainerAsync(containerId, "file", cancellationToken);
+        var results = new List<FileObject>(items.Count);
+
+        foreach (var item in items)
+        {
+            var cf = await store.GetContentFileByItemIdAsync(item.Id, cancellationToken);
+            if (cf is not null)
+                results.Add(new FileObject(item, cf));
+        }
+
+        return results.OrderByDescending(f => f.ContentItem.ModifiedAt).ToList();
     }
 
     private static string RequireValue(string? value, string message, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))
-        {
             throw new ArgumentException(message, parameterName);
-        }
-
         return value.Trim();
     }
 
     private static string NormalizeContentType(string? contentType)
-    {
-        return string.IsNullOrWhiteSpace(contentType)
-            ? "application/octet-stream"
-            : contentType.Trim();
-    }
+        => string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType.Trim();
 
     private static string CreateContentName(string fileName)
     {

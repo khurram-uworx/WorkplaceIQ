@@ -1,5 +1,5 @@
 > **Historical** — Pre-development requirements document (June 2026).  
-> See [README.md](../README.md) for current state and [PLAN.md](PLAN.md) for upcoming work.
+> See [README.md](../README.md) for current state.
 
 # WorkplaceIQ Requirements
 

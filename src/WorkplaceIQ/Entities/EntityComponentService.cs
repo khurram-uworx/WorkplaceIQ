@@ -20,17 +20,18 @@ public sealed class EntityComponentService(
             new ComponentRequest(
                 request.Id,
                 request.Title ?? string.Empty,
-                ContentTypes.EntityContainer,
+                "EntityContainer",
                 request.AutoProvision,
                 "entity list"),
             cancellationToken);
 
-        var entities = result.Container is null
+        var container = result.Container as GroupContent;
+        var entities = container is null
             ? []
-            : await store.GetChildrenAsync(result.Container.Id, cancellationToken: cancellationToken);
+            : await store.GetItemsByContainerAsync(container.Id, "member", cancellationToken);
 
         return new EntityComponentResult(
-            result.Container,
+            container,
             entities,
             result.Created,
             result.Missing,
@@ -38,14 +39,21 @@ public sealed class EntityComponentService(
             entityType);
     }
 
-    public Task<Content.Content?> ResolveDetailAsync(
+    public async Task<ContentItem?> ResolveDetailAsync(
         string name,
         CancellationToken cancellationToken = default)
     {
-        return store.GetContentByNameAsync(name, cancellationToken);
+        var container = await store.GetContainerByNameAsync<GroupContent>(name, cancellationToken);
+        if (container is not null)
+        {
+            var items = await store.GetItemsByContainerAsync(container.Id, cancellationToken: cancellationToken);
+            return items.FirstOrDefault();
+        }
+
+        return await store.GetItemByIdAsync(Guid.TryParse(name, out var id) ? id : Guid.Empty, cancellationToken);
     }
 
-    public async Task<Content.Content> CreateEntityAsync(
+    public async Task<ContentItem> CreateEntityAsync(
         EntityCreateRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -54,35 +62,28 @@ public sealed class EntityComponentService(
         var name = RequireValue(request.Name, "An entity name is required.", nameof(request));
         var title = RequireValue(request.Title, "An entity title is required.", nameof(request));
 
-        var container = await store.GetContentByNameAsync(
-            listId,
-            cancellationToken);
-
-        if (container is null)
-        {
-            throw new InvalidOperationException($"Entity list '{listId}' does not exist.");
-        }
+        var container = await store.GetContainerByNameAsync<GroupContent>(listId, cancellationToken)
+            ?? throw new InvalidOperationException($"Entity list '{listId}' does not exist.");
 
         var now = DateTime.UtcNow;
-        var entity = new Content.Content
+        var entity = new ContentItem
         {
-            ParentId = container.Id,
-            ContentType = entityType,
+            ContainerId = container.Id,
+            Discriminator = "member",
             Name = name,
             Title = title,
             Body = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             Status = string.IsNullOrWhiteSpace(request.Status) ? "active" : request.Status.Trim(),
-            MetadataJson = string.IsNullOrWhiteSpace(request.MetadataJson) ? null : request.MetadataJson,
+            ContentData = string.IsNullOrWhiteSpace(request.MetadataJson) ? null : request.MetadataJson,
             CreatedAt = now,
-            UpdatedAt = now
+            ModifiedAt = now
         };
 
-        var created = await store.CreateContentAsync(entity, cancellationToken);
+        var created = await store.CreateItemAsync(entity, cancellationToken);
 
         foreach (var label in LabelName.ParseList(request.Labels))
         {
-            await store.AddLabelToContentAsync(created.Id, label, cancellationToken);
+            await store.AddLabelToItemAsync(created.Id, label, cancellationToken);
         }
 
         return created;
@@ -96,25 +97,22 @@ public sealed class EntityComponentService(
         CancellationToken cancellationToken = default)
     {
         if (sourceContentId == targetContentId)
-        {
             throw new ArgumentException("A relationship requires two different entities.", nameof(targetContentId));
-        }
 
         var normalizedType = RequireValue(relationshipType, "A relationship type is required.", nameof(relationshipType));
 
-        var source = await store.GetContentByIdAsync(sourceContentId, cancellationToken);
-        var target = await store.GetContentByIdAsync(targetContentId, cancellationToken);
+        var source = await store.GetItemByIdAsync(sourceContentId, cancellationToken);
+        var target = await store.GetItemByIdAsync(targetContentId, cancellationToken);
 
         if (source is null || target is null)
-        {
             throw new InvalidOperationException("Both entities must exist before a relationship can be created.");
-        }
 
+        // Relationships are at the container level — resolve container IDs
         return await store.CreateContentRelationshipAsync(
             new ContentRelationship
             {
-                SourceContentId = sourceContentId,
-                TargetContentId = targetContentId,
+                SourceContentId = source.ContainerId,
+                TargetContentId = target.ContainerId,
                 RelationshipType = normalizedType,
                 MetadataJson = metadataJson
             },
@@ -124,10 +122,7 @@ public sealed class EntityComponentService(
     private static string RequireValue(string? value, string message, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))
-        {
             throw new ArgumentException(message, parameterName);
-        }
-
         return value.Trim();
     }
 }

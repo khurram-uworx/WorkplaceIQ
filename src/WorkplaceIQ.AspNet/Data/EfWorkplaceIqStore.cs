@@ -1,434 +1,187 @@
 using Microsoft.EntityFrameworkCore;
 using System.Runtime.CompilerServices;
 using WorkplaceIQ.Content;
-using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Metrics;
-using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.AspNet.Data;
 
 public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> dbContextFactory) : IWorkplaceIqStore
 {
-    public async Task<Content.Content?> GetContentByNameAsync(
-        string name,
-        CancellationToken cancellationToken = default)
+    // ── Container CRUD ──────────────────────────────────────────────
+
+    public async Task<T?> GetContainerByIdAsync<T>(Guid id, CancellationToken cancellationToken = default)
+        where T : Container
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Contents
+        return await db.Set<T>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
+    public async Task<T?> GetContainerByNameAsync<T>(string name, CancellationToken cancellationToken = default)
+        where T : Container
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Set<T>()
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Name == name, cancellationToken);
     }
 
-    public async Task<Content.Content?> GetContentByIdAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<T>> GetContainersByTypeAsync<T>(CancellationToken cancellationToken = default)
+        where T : Container
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Contents
+        return await db.Set<T>()
             .AsNoTracking()
-            .Include(c => c.ContentLabels)
-                .ThenInclude(cl => cl.Label)
-            .Include(c => c.SourceRelationships)
-                .ThenInclude(r => r.TargetContent)
-            .Include(c => c.TargetRelationships)
-                .ThenInclude(r => r.SourceContent)
-            .FirstOrDefaultAsync(c => c.Id == contentId, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<Content.Content>> GetChildrenAsync(
-        Guid parentId,
-        string? contentType = null,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var query = db.Contents
-            .AsNoTracking()
-            .Include(c => c.ContentLabels)
-                .ThenInclude(cl => cl.Label)
-            .Where(c => c.ParentId == parentId)
-            .Where(c => c.Status != "archived");
-
-        if (!string.IsNullOrWhiteSpace(contentType))
-        {
-            query = query.Where(c => c.ContentType == contentType);
-        }
-
-        return await query
-            .OrderBy(c => c.Title)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<Content.Content>> GetContentByTypeAsync(
-        string contentType,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Contents
-            .AsNoTracking()
-            .Where(c => c.ContentType == contentType)
             .Where(c => c.Status != "archived")
             .OrderBy(c => c.Title)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Content.Content> CreateContentAsync(
-        Content.Content content,
-        CancellationToken cancellationToken = default)
+    public async Task<T> CreateContainerAsync<T>(T container, CancellationToken cancellationToken = default)
+        where T : Container
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        db.Contents.Add(content);
+        db.Set<T>().Add(container);
         await db.SaveChangesAsync(cancellationToken);
-        return content;
+        return container;
     }
 
-    public async Task<Content.Content> UpdateContentAsync(
-        Content.Content content,
-        CancellationToken cancellationToken = default)
+    public async Task<T> UpdateContainerAsync<T>(T container, CancellationToken cancellationToken = default)
+        where T : Container
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        db.Contents.Update(content);
+        db.Set<T>().Update(container);
         await db.SaveChangesAsync(cancellationToken);
-        return content;
+        return container;
     }
 
-    public async Task DeleteContentAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Container>> GetAllContainersAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var content = await db.Contents.FirstOrDefaultAsync(c => c.Id == contentId, cancellationToken);
-        if (content is null)
-        {
-            return;
-        }
-
-        content.Status = "archived";
-        content.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<Post>> GetPostsAsync(
-        Guid containerId,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var posts = await db.Posts
+        return await db.Contents
+            .OfType<Container>()
             .AsNoTracking()
-            .Include(post => post.PostLabels)
-                .ThenInclude(postLabel => postLabel.Label)
-            .Where(post => post.ContainerId == containerId)
+            .Where(c => c.Status != "archived")
+            .OrderBy(c => c.Title)
             .ToListAsync(cancellationToken);
-
-        return posts
-            .OrderByDescending(post => post.CreatedAt)
-            .ToList();
     }
 
-    public async Task<Post?> GetPostByIdAsync(
-        Guid postId,
-        CancellationToken cancellationToken = default)
+    public async Task DeleteContainerAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Posts
-            .AsNoTracking()
-            .Include(post => post.PostLabels)
-                .ThenInclude(postLabel => postLabel.Label)
-            .FirstOrDefaultAsync(post => post.Id == postId, cancellationToken);
-    }
+        var container = await db.Contents.OfType<Container>()
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (container is null) return;
 
-    public async Task<Post> CreatePostAsync(
-        Guid containerId,
-        string title,
-        string body,
-        IReadOnlyList<LabelName> labels,
-        Guid? contentId = null,
-        string? postType = null,
-        string? authorUserId = null,
-        bool isSystemGenerated = false,
-        string? metadataJson = null,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var containerType = await db.Contents
-            .AsNoTracking()
-            .Where(c => c.Id == containerId)
-            .Select(c => c.ContentType)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var post = new Post
-        {
-            ContainerId = containerId,
-            Title = title,
-            Body = body,
-            ContentId = contentId,
-            PostType = postType ?? InferPostType(contentId, containerType),
-            AuthorUserId = authorUserId,
-            IsSystemGenerated = isSystemGenerated,
-            MetadataJson = metadataJson,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        db.Posts.Add(post);
-
-        foreach (var labelName in labels)
-        {
-            var label = await db.Labels.FirstOrDefaultAsync(
-                candidate => candidate.NormalizedName == labelName.NormalizedName,
-                cancellationToken);
-
-            if (label is null)
-            {
-                label = new Label
-                {
-                    Name = labelName.Name,
-                    NormalizedName = labelName.NormalizedName,
-                    Slug = labelName.Slug,
-                    CreatedAt = DateTime.UtcNow
-                };
-                db.Labels.Add(label);
-            }
-
-            post.PostLabels.Add(new PostLabel
-            {
-                Post = post,
-                Label = label
-            });
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-
-        return post;
-    }
-
-    public async Task<Post> UpdatePostAsync(
-        Post post,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        db.Posts.Update(post);
-        await db.SaveChangesAsync(cancellationToken);
-        return post;
-    }
-
-    public async Task DeletePostAsync(
-        Guid postId,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var post = await db.Posts.FirstOrDefaultAsync(candidate => candidate.Id == postId, cancellationToken);
-        if (post is null)
-        {
-            return;
-        }
-
-        db.Posts.Remove(post);
+        container.Status = "archived";
+        container.ModifiedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static string InferPostType(Guid? contentId, string? containerType)
-    {
-        if (contentId.HasValue)
-        {
-            return PostTypes.Comment;
-        }
+    // ── ContentItem CRUD ────────────────────────────────────────────
 
-        return containerType == ContentTypes.ForumContainer
-            ? PostTypes.Thread
-            : PostTypes.Post;
-    }
-
-    public async Task<IReadOnlyList<FileObject>> GetFilesByContainerAsync(
-        Guid containerId,
-        CancellationToken cancellationToken = default)
+    public async Task<ContentItem?> GetItemByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var rows = await db.FileRecords
+        return await db.ContentItems
             .AsNoTracking()
-            .Include(file => file.Content!)
-                .ThenInclude(content => content.ContentLabels)
-                    .ThenInclude(contentLabel => contentLabel.Label)
-            .Include(file => file.Content!)
-                .ThenInclude(content => content.Posts)
-                    .ThenInclude(post => post.PostLabels)
-                        .ThenInclude(postLabel => postLabel.Label)
-            .Where(file => file.Content != null)
-            .Where(file => file.Content!.ParentId == containerId)
-            .Where(file => file.Content!.ContentType == FileContentTypes.File)
-            .Where(file => file.Content!.Status != "archived")
+            .Include(ci => ci.Labels)
+                .ThenInclude(l => l.Label)
+            .FirstOrDefaultAsync(ci => ci.Name == name, cancellationToken);
+    }
+
+    public async Task<ContentItem?> GetItemByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.ContentItems
+            .AsNoTracking()
+            .Include(ci => ci.Labels)
+                .ThenInclude(l => l.Label)
+            .FirstOrDefaultAsync(ci => ci.Id == id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ContentItem>> GetItemsByContainerAsync(
+        Guid containerId, string? discriminator = null, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.ContentItems
+            .AsNoTracking()
+            .Include(ci => ci.Labels)
+                .ThenInclude(l => l.Label)
+            .Where(ci => ci.ContainerId == containerId)
+            .Where(ci => ci.Status != "archived");
+
+        if (!string.IsNullOrWhiteSpace(discriminator))
+            query = query.Where(ci => ci.Discriminator == discriminator);
+
+        return await query
+            .OrderByDescending(ci => ci.CreatedAt)
             .ToListAsync(cancellationToken);
-
-        return rows
-            .Select(file => new FileObject(file.Content!, file))
-            .OrderByDescending(file => file.Content.UpdatedAt)
-            .ToList();
     }
 
-    public async Task<FileObject?> GetFileByContentIdAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
+    public async Task<ContentItem> CreateItemAsync(ContentItem item, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var file = await db.FileRecords
+        db.ContentItems.Add(item);
+        await db.SaveChangesAsync(cancellationToken);
+        return item;
+    }
+
+    public async Task<ContentItem> UpdateItemAsync(ContentItem item, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.ContentItems.Update(item);
+        await db.SaveChangesAsync(cancellationToken);
+        return item;
+    }
+
+    public async Task DeleteItemAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await db.ContentItems.FirstOrDefaultAsync(ci => ci.Id == id, cancellationToken);
+        if (item is null) return;
+
+        item.Status = "archived";
+        item.ModifiedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // ── File CRUD ───────────────────────────────────────────────────
+
+    public async Task<ContentFile?> GetContentFileByItemIdAsync(Guid itemId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.ContentFiles
             .AsNoTracking()
-            .Include(candidate => candidate.Content!)
-                .ThenInclude(content => content.ContentLabels)
-                    .ThenInclude(contentLabel => contentLabel.Label)
-            .Include(candidate => candidate.Content!)
-                .ThenInclude(content => content.Posts)
-                    .ThenInclude(post => post.PostLabels)
-                        .ThenInclude(postLabel => postLabel.Label)
-            .FirstOrDefaultAsync(candidate => candidate.ContentId == contentId, cancellationToken);
-
-        if (file?.Content is null || file.Content.Status == "archived")
-        {
-            return null;
-        }
-
-        return new FileObject(file.Content, file);
+            .FirstOrDefaultAsync(f => f.Id == itemId, cancellationToken);
     }
 
-    public async Task<FileObject> CreateFileRecordAsync(
-        FileRecord fileRecord,
-        CancellationToken cancellationToken = default)
+    public async Task<ContentFile> CreateContentFileAsync(ContentFile file, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        db.FileRecords.Add(fileRecord);
+        db.ContentFiles.Add(file);
         await db.SaveChangesAsync(cancellationToken);
-        db.FileRecords.Remove(fileRecord);
-
-        var file = await GetFileByContentIdAsync(fileRecord.ContentId, cancellationToken);
-        return file ?? throw new InvalidOperationException($"File content '{fileRecord.ContentId}' was not found after creation.");
+        return file;
     }
 
-    public async Task<ContentRelationship> CreateContentRelationshipAsync(
-        ContentRelationship relationship,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        db.ContentRelationships.Add(relationship);
-        await db.SaveChangesAsync(cancellationToken);
-        return relationship;
-    }
+    // ── Classification ──────────────────────────────────────────────
 
-    public async Task AddLabelToContentAsync(
-        Guid contentId,
-        LabelName label,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var labelEntity = await GetOrCreateLabelAsync(db, label, cancellationToken);
-        var exists = await db.ContentLabels.AnyAsync(
-            cl => cl.ContentId == contentId && cl.LabelId == labelEntity.Id,
-            cancellationToken);
-
-        if (!exists)
-        {
-            db.ContentLabels.Add(new ContentLabel
-            {
-                ContentId = contentId,
-                LabelId = labelEntity.Id
-            });
-            await db.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    public async Task AddLabelToPostAsync(
-        Guid postId,
-        LabelName label,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var labelEntity = await GetOrCreateLabelAsync(db, label, cancellationToken);
-        var exists = await db.PostLabels.AnyAsync(
-            postLabel => postLabel.PostId == postId && postLabel.LabelId == labelEntity.Id,
-            cancellationToken);
-
-        if (!exists)
-        {
-            db.PostLabels.Add(new PostLabel
-            {
-                PostId = postId,
-                LabelId = labelEntity.Id
-            });
-            await db.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    private static async Task<Label> GetOrCreateLabelAsync(
-        WorkplaceIqDbContext db,
-        LabelName labelName,
-        CancellationToken cancellationToken)
-    {
-        var label = await db.Labels.FirstOrDefaultAsync(
-            candidate => candidate.NormalizedName == labelName.NormalizedName,
-            cancellationToken);
-
-        if (label is not null)
-        {
-            return label;
-        }
-
-        label = new Label
-        {
-            Name = labelName.Name,
-            NormalizedName = labelName.NormalizedName,
-            Slug = labelName.Slug,
-            CreatedAt = DateTime.UtcNow
-        };
-        db.Labels.Add(label);
-        await db.SaveChangesAsync(cancellationToken);
-        return label;
-    }
-
-    // ----- Label queries -----
-
-    public async Task<Label?> GetLabelByNameAsync(
-        string name,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Labels
-            .AsNoTracking()
-            .FirstOrDefaultAsync(l => l.NormalizedName == name.ToLowerInvariant(), cancellationToken);
-    }
-
-    public async Task<Label> CreateLabelAsync(
-        Label label,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        db.Labels.Add(label);
-        await db.SaveChangesAsync(cancellationToken);
-        return label;
-    }
-
-    // ----- Classification queries -----
-
-    /// <summary>
-    /// Base query for read-only classified item access. Encapsulates the
-    /// AsNoTrackingWithIdentityResolution + Include boilerplate shared by all
-    /// classified item queries. Not used for write operations (Upsert, Update)
-    /// which require change tracking.
-    /// </summary>
     private IQueryable<ClassifiedItem> ClassifiedItemQuery(WorkplaceIqDbContext db)
         => db.ClassifiedItems
             .AsNoTrackingWithIdentityResolution()
             .Include(item => item.RssItem)
             .Include(item => item.SignalLabel);
 
-    public async Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
+    public async Task<ClassifiedItem?> GetClassifiedItemByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await ClassifiedItemQuery(db)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
     }
 
-    public async Task<ClassifiedItem?> GetClassifiedByContentIdAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
+    public async Task<ClassifiedItem?> GetClassifiedByContentIdAsync(Guid contentId, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await ClassifiedItemQuery(db)
@@ -436,10 +189,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
     }
 
     public async Task<IReadOnlyList<ClassifiedItem>> GetClassifiedItemsByLabelAsync(
-        Guid labelId,
-        int offset = 0,
-        int limit = 50,
-        CancellationToken cancellationToken = default)
+        Guid labelId, int offset = 0, int limit = 50, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await ClassifiedItemQuery(db)
@@ -450,9 +200,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(
-        int limit = 20,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(int limit = 20, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await ClassifiedItemQuery(db)
@@ -462,20 +210,10 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Upserts a classification by ContentId. Ensures the one-classification-per-content invariant.
-    /// When ADR 02 refactors Content into Container/ContentItem, this method must be updated to
-    /// match the new entity hierarchy while preserving the one-per-content invariant.
-    /// </summary>
-    public async Task<ClassifiedItem> UpsertClassifiedItemAsync(
-        ClassifiedItem item,
-        CancellationToken cancellationToken = default)
+    public async Task<ClassifiedItem> UpsertClassifiedItemAsync(ClassifiedItem item, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // Find existing classification for this content. If found, update in-place
-        // preserving the original Id (stable reference) but overwriting all other fields.
-        // This is the "last classification wins" behavior.
         var existing = await db.ClassifiedItems
             .FirstOrDefaultAsync(ci => ci.ContentId == item.ContentId, cancellationToken);
 
@@ -498,9 +236,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         return item;
     }
 
-    public async Task<ClassifiedItem> UpdateClassifiedItemAsync(
-        ClassifiedItem item,
-        CancellationToken cancellationToken = default)
+    public async Task<ClassifiedItem> UpdateClassifiedItemAsync(ClassifiedItem item, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         db.ClassifiedItems.Update(item);
@@ -508,8 +244,7 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         return item;
     }
 
-    public async Task<Dictionary<Guid, int>> GetSignalCountsAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<Dictionary<Guid, int>> GetSignalCountsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await db.ClassifiedItems
@@ -518,13 +253,10 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
             .ToDictionaryAsync(g => g.LabelId, g => g.Count, cancellationToken);
     }
 
-    public async Task DeleteClassifiedItemAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
+    public async Task DeleteClassifiedItemAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var item = await db.ClassifiedItems
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        var item = await db.ClassifiedItems.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
         if (item is not null)
         {
             db.ClassifiedItems.Remove(item);
@@ -532,32 +264,102 @@ public sealed class EfWorkplaceIqStore(IDbContextFactory<WorkplaceIqDbContext> d
         }
     }
 
-    public async IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
-        int limit,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ContentItem> GetUnclassifiedItemsAsync(int limit, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var items = await db.Contents
+        var items = await db.ContentItems
             .AsNoTracking()
-            .Include(c => c.ContentLabels)
-                .ThenInclude(cl => cl.Label)
-            .Where(c => c.Status != "archived")
-            .Where(c => c.RetryCount < 5)
-            .Where(c => !db.ClassifiedItems.Any(ci => ci.ContentId == c.Id))
-            .OrderByDescending(c => c.CreatedAt)
+            .Include(ci => ci.Labels)
+                .ThenInclude(l => l.Label)
+            .Where(ci => ci.Status != "archived")
+            .Where(ci => !db.ClassifiedItems.Any(cfi => cfi.ContentId == ci.Id))
+            .OrderByDescending(ci => ci.CreatedAt)
             .Take(limit)
             .ToListAsync(cancellationToken);
 
         foreach (var item in items)
-        {
             yield return item;
+    }
+
+    // ── Labels ──────────────────────────────────────────────────────
+
+    public async Task<Label?> GetLabelByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Labels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.NormalizedName == name.ToUpperInvariant(), cancellationToken);
+    }
+
+    public async Task<Label> CreateLabelAsync(Label label, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.Labels.Add(label);
+        await db.SaveChangesAsync(cancellationToken);
+        return label;
+    }
+
+    public async Task AddLabelToContentAsync(Guid contentId, LabelName label, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var labelEntity = await GetOrCreateLabelAsync(db, label, cancellationToken);
+        var exists = await db.ContentLabels.AnyAsync(
+            cl => cl.ContentId == contentId && cl.LabelId == labelEntity.Id, cancellationToken);
+
+        if (!exists)
+        {
+            db.ContentLabels.Add(new ContentLabel { ContentId = contentId, LabelId = labelEntity.Id });
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 
-    public async Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
-        string name,
-        CancellationToken cancellationToken = default)
+    public async Task AddLabelToItemAsync(Guid itemId, LabelName label, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var labelEntity = await GetOrCreateLabelAsync(db, label, cancellationToken);
+        var exists = await db.ContentItemLabels.AnyAsync(
+            cil => cil.ContentItemId == itemId && cil.LabelId == labelEntity.Id, cancellationToken);
+
+        if (!exists)
+        {
+            db.ContentItemLabels.Add(new ContentItemLabel { ContentItemId = itemId, LabelId = labelEntity.Id });
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static async Task<Label> GetOrCreateLabelAsync(
+        WorkplaceIqDbContext db, LabelName labelName, CancellationToken cancellationToken)
+    {
+        var label = await db.Labels.FirstOrDefaultAsync(
+            candidate => candidate.NormalizedName == labelName.NormalizedName, cancellationToken);
+        if (label is not null) return label;
+
+        label = new Label
+        {
+            Name = labelName.Name,
+            NormalizedName = labelName.NormalizedName,
+            Slug = labelName.Slug,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.Labels.Add(label);
+        await db.SaveChangesAsync(cancellationToken);
+        return label;
+    }
+
+    // ── Relationships ───────────────────────────────────────────────
+
+    public async Task<ContentRelationship> CreateContentRelationshipAsync(ContentRelationship relationship, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        db.ContentRelationships.Add(relationship);
+        await db.SaveChangesAsync(cancellationToken);
+        return relationship;
+    }
+
+    // ── Metrics ─────────────────────────────────────────────────────
+
+    public async Task<MetricDefinition?> GetMetricDefinitionByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await db.MetricDefinitions

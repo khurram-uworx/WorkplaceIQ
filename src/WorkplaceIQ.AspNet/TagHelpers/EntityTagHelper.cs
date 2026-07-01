@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using WorkplaceIQ.AspNet.Rendering;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Entities;
 
 namespace WorkplaceIQ.AspNet.TagHelpers;
@@ -39,11 +40,11 @@ public sealed class EntityTagHelper(
         if (content is null)
         {
             output.Attributes.SetAttribute("data-iq-missing", "true");
-            output.Content.SetHtmlContent(renderer.RenderEntityDetail(new Content.Content
+            output.Content.SetHtmlContent(renderer.RenderEntityDetail(new ContentItem
             {
                 Name = Id,
                 Title = string.IsNullOrWhiteSpace(Title) ? Id : Title,
-                ContentType = Type
+                Discriminator = Type
             }));
             return;
         }

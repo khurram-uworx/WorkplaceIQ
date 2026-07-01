@@ -1,21 +1,23 @@
+using WorkplaceIQ.Content;
+
 namespace WorkplaceIQ.Metrics;
 
 public abstract class MetricProviderBase
 {
-    protected static async Task<IReadOnlyList<(Content.Content Container, IReadOnlyList<Content.Content> Items)>> GetContainerItemsAsync(
+    protected static async Task<IReadOnlyList<(Container Container, IReadOnlyList<ContentItem> Items)>> GetContainerItemsAsync(
         MetricRequest request,
         IWorkplaceIqStore store,
         CancellationToken cancellationToken)
     {
         var containers = request.ContainerId.HasValue
             ? await GetSingleContainerAsync(request, store, cancellationToken)
-            : await store.GetContentByTypeAsync(request.ContainerType ?? string.Empty, cancellationToken);
+            : await store.GetAllContainersAsync(cancellationToken);
 
-        var results = new List<(Content.Content Container, IReadOnlyList<Content.Content> Items)>();
+        var results = new List<(Container Container, IReadOnlyList<ContentItem> Items)>();
 
         foreach (var container in containers)
         {
-            var items = await store.GetChildrenAsync(container.Id, cancellationToken: cancellationToken);
+            var items = await store.GetItemsByContainerAsync(container.Id, cancellationToken: cancellationToken);
             results.Add((container, FilterItems(request, items).ToList()));
         }
 
@@ -24,13 +26,13 @@ public abstract class MetricProviderBase
 
     protected static IReadOnlyDictionary<string, object?> CreateTags(
         MetricRequest request,
-        Content.Content container)
+        Container container)
     {
         var tags = new Dictionary<string, object?>
         {
             ["container.id"] = container.Id.ToString(),
             ["container.name"] = container.Name,
-            ["container.type"] = container.ContentType
+            ["container.type"] = container.GetType().Name
         };
 
         if (!string.IsNullOrWhiteSpace(request.ContentType))
@@ -77,26 +79,26 @@ public abstract class MetricProviderBase
         return null;
     }
 
-    private static async Task<IReadOnlyList<Content.Content>> GetSingleContainerAsync(
+    private static async Task<IReadOnlyList<Container>> GetSingleContainerAsync(
         MetricRequest request,
         IWorkplaceIqStore store,
         CancellationToken cancellationToken)
     {
-        var containers = await store.GetContentByTypeAsync(request.ContainerType ?? string.Empty, cancellationToken);
+        var containers = await store.GetAllContainersAsync(cancellationToken);
         return containers
             .Where(container => container.Id == request.ContainerId)
             .ToList();
     }
 
-    private static IEnumerable<Content.Content> FilterItems(
+    private static IEnumerable<ContentItem> FilterItems(
         MetricRequest request,
-        IReadOnlyList<Content.Content> items)
+        IReadOnlyList<ContentItem> items)
     {
         var filtered = items.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(request.ContentType))
         {
-            filtered = filtered.Where(item => item.ContentType == request.ContentType);
+            filtered = filtered.Where(item => item.Discriminator == request.ContentType);
         }
 
         var start = GetWindowStart(request.Window);

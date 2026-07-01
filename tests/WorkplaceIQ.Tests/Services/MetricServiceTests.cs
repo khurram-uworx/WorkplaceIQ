@@ -11,10 +11,9 @@ public class MetricServiceTests
     public async Task ComputeAsync_ReturnsContentCountForSourceContainer()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var container = await store.CreateContentAsync(new Content.Content
+        var container = await store.CreateContainerAsync(new FeedContent
         {
             Name = "FactoryPowerOutages",
-            ContentType = ContentTypes.FeedContainer,
             Title = "Factory Power Outages"
         });
         AddContentItem(store, container.Id, "Outage", createdAt: DateTime.UtcNow.AddDays(-1));
@@ -24,7 +23,6 @@ public class MetricServiceTests
         var result = await service.ComputeAsync(new MetricRequest(
             MetricNames.ContainerContentCount,
             ContainerId: container.Id,
-            ContainerType: ContentTypes.FeedContainer,
             ContentType: "Outage",
             Window: "last_7_days"));
 
@@ -39,10 +37,9 @@ public class MetricServiceTests
     public async Task ComputeAsync_ReturnsMetadataSumWithDisplayUnit()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var container = await store.CreateContentAsync(new Content.Content
+        var container = await store.CreateContainerAsync(new FeedContent
         {
             Name = "FactoryPowerOutages",
-            ContentType = ContentTypes.FeedContainer,
             Title = "Factory Power Outages"
         });
         AddContentItem(store, container.Id, "Outage", durationSeconds: 3600, createdAt: DateTime.UtcNow.AddDays(-1));
@@ -52,7 +49,6 @@ public class MetricServiceTests
         var result = await service.ComputeAsync(new MetricRequest(
             MetricNames.MetadataSum,
             ContainerId: container.Id,
-            ContainerType: ContentTypes.FeedContainer,
             ContentType: "Outage",
             SourceField: "durationSeconds",
             Window: "last_7_days",
@@ -69,22 +65,19 @@ public class MetricServiceTests
     public async Task ComputeSeriesAsync_ExpandsGenericMetricAcrossMatchingContainers()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var factory = await store.CreateContentAsync(new Content.Content
+        var factory = await store.CreateContainerAsync(new FeedContent
         {
             Name = "FactoryPowerOutages",
-            ContentType = ContentTypes.FeedContainer,
             Title = "Factory Power Outages"
         });
-        var office = await store.CreateContentAsync(new Content.Content
+        var office = await store.CreateContainerAsync(new FeedContent
         {
             Name = "OfficePowerOutages",
-            ContentType = ContentTypes.FeedContainer,
             Title = "Office Power Outages"
         });
-        var forum = await store.CreateContentAsync(new Content.Content
+        var forum = await store.CreateContainerAsync(new DiscussionContent
         {
             Name = "MaintenanceForum",
-            ContentType = ContentTypes.ForumContainer,
             Title = "Maintenance Forum"
         });
         AddContentItem(store, factory.Id, "Outage", createdAt: DateTime.UtcNow.AddDays(-1));
@@ -95,13 +88,14 @@ public class MetricServiceTests
 
         var series = await service.ComputeSeriesAsync(new MetricRequest(
             MetricNames.ContainerContentCount,
-            ContainerType: ContentTypes.FeedContainer,
             ContentType: "Outage",
             Window: "last_7_days"));
 
-        Assert.That(series, Has.Count.EqualTo(2));
-        Assert.That(series.Single(result => (string)result.Tags["container.name"]! == "FactoryPowerOutages").Value, Is.EqualTo(2));
-        Assert.That(series.Single(result => (string)result.Tags["container.name"]! == "OfficePowerOutages").Value, Is.EqualTo(1));
+        Assert.That(series, Has.Count.EqualTo(3));
+        var factoryResult = series.Single(r => (string)r.Tags["container.name"]! == "FactoryPowerOutages");
+        var officeResult = series.Single(r => (string)r.Tags["container.name"]! == "OfficePowerOutages");
+        Assert.That(factoryResult.Value, Is.EqualTo(2));
+        Assert.That(officeResult.Value, Is.EqualTo(1));
     }
 
     [Test]
@@ -122,15 +116,15 @@ public class MetricServiceTests
         double durationSeconds = 0,
         DateTime? createdAt = null)
     {
-        store.Contents.Add(new Content.Content
+        store.Items.Add(new ContentItem
         {
-            ParentId = containerId,
-            ContentType = contentType,
+            ContainerId = containerId,
+            Discriminator = contentType,
             Name = Guid.NewGuid().ToString("N"),
             Title = contentType,
             Status = "published",
             CreatedAt = createdAt ?? DateTime.UtcNow,
-            MetadataJson = $$"""{"durationSeconds": {{durationSeconds}}}"""
+            ContentData = $$"""{"durationSeconds": {{durationSeconds}}}"""
         });
     }
 

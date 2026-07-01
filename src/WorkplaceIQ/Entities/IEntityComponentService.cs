@@ -8,11 +8,11 @@ public interface IEntityComponentService
         EntityComponentRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<Content.Content?> ResolveDetailAsync(
+    Task<ContentItem?> ResolveDetailAsync(
         string name,
         CancellationToken cancellationToken = default);
 
-    Task<Content.Content> CreateEntityAsync(
+    Task<ContentItem> CreateEntityAsync(
         EntityCreateRequest request,
         CancellationToken cancellationToken = default);
 

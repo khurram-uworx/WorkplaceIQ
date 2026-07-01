@@ -3,6 +3,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.S3.Util;
 using Microsoft.Extensions.Options;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Files;
 
 namespace WorkplaceIQ.AspNet.Files;
@@ -70,26 +71,26 @@ public sealed class S3FileObjectStorage : IFileObjectStorage
     }
 
     public async Task<Stream> OpenReadAsync(
-        FileRecord fileRecord,
+        ContentFile contentFile,
         CancellationToken cancellationToken = default)
     {
         var response = await client.GetObjectAsync(new GetObjectRequest
         {
-            BucketName = fileRecord.BucketName,
-            Key = fileRecord.ObjectKey
+            BucketName = contentFile.BucketName,
+            Key = contentFile.ObjectKey
         }, cancellationToken);
 
         return response.ResponseStream;
     }
 
     public Task DeleteAsync(
-        FileRecord fileRecord,
+        ContentFile contentFile,
         CancellationToken cancellationToken = default)
     {
         return client.DeleteObjectAsync(new DeleteObjectRequest
         {
-            BucketName = fileRecord.BucketName,
-            Key = fileRecord.ObjectKey
+            BucketName = contentFile.BucketName,
+            Key = contentFile.ObjectKey
         }, cancellationToken);
     }
 }

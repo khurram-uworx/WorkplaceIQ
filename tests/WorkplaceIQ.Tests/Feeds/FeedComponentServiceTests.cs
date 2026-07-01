@@ -27,7 +27,7 @@ public class FeedComponentServiceTests
         Assert.That(first.DisplayTitle, Is.EqualTo("News Feed"));
         Assert.That(second.Created, Is.False);
         Assert.That(second.DisplayTitle, Is.EqualTo("News Feed"));
-        Assert.That(store.Contents, Has.Count.EqualTo(1));
+        Assert.That(store.FeedContents, Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -40,10 +40,10 @@ public class FeedComponentServiceTests
             "PowerOutages",
             "Power Outages",
             true));
-        store.Contents.Add(new Content.Content
+        await store.CreateItemAsync(new ContentItem
         {
-            ParentId = feed.Container!.Id,
-            ContentType = "Outage",
+            ContainerId = feed.Container!.Id,
+            Discriminator = "Outage",
             Name = "generator-3-outage",
             Title = "Generator 3 outage"
         });
@@ -53,7 +53,7 @@ public class FeedComponentServiceTests
             "Power Outages",
             true));
 
-        Assert.That(result.ContentItems.Select(item => item.Title), Is.EquivalentTo(new[] { "Generator 3 outage" }));
+        Assert.That(result.Items.Select(item => item.Title), Is.EquivalentTo(new[] { "Generator 3 outage" }));
     }
 
     [Test]
@@ -69,7 +69,7 @@ public class FeedComponentServiceTests
 
         Assert.That(result.Missing, Is.True);
         Assert.That(result.Created, Is.False);
-        Assert.That(store.Contents, Is.Empty);
+        Assert.That(store.FeedContents, Is.Empty);
     }
 
     [Test]
@@ -95,8 +95,8 @@ public class FeedComponentServiceTests
             true));
 
         Assert.That(result.DisplayTitle, Is.EqualTo("News Feed"));
-        Assert.That(store.Contents[0].Name, Is.EqualTo("CompanyNews"));
-        Assert.That(store.Contents[0].Title, Is.EqualTo("News Feed"));
+        Assert.That(store.FeedContents[0].Name, Is.EqualTo("CompanyNews"));
+        Assert.That(store.FeedContents[0].Title, Is.EqualTo("News Feed"));
     }
 
     [Test]
@@ -104,10 +104,9 @@ public class FeedComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateFeedService(store);
-        await store.CreateContentAsync(new Content.Content
+        await store.CreateContainerAsync(new FeedContent
         {
             Name = "CompanyNews",
-            ContentType = ContentTypes.FeedContainer,
             Title = "News Feed"
         });
 
@@ -116,12 +115,12 @@ public class FeedComponentServiceTests
             " First item ",
             " Hello from the feed. ");
 
-        var container = store.Contents.Single();
+        var container = store.FeedContents.Single();
         Assert.That(post.ContainerId, Is.EqualTo(container.Id));
-        Assert.That(store.Posts, Has.Count.EqualTo(1));
-        Assert.That(store.Posts[0].Title, Is.EqualTo("First item"));
-        Assert.That(store.Posts[0].Body, Is.EqualTo("Hello from the feed."));
-        Assert.That(post.PostType, Is.EqualTo("post"));
+        Assert.That(store.Items, Has.Count.EqualTo(1));
+        Assert.That(store.Items[0].Title, Is.EqualTo("First item"));
+        Assert.That(store.Items[0].Body, Is.EqualTo("Hello from the feed."));
+        Assert.That(post.Discriminator, Is.EqualTo("feed_entry"));
     }
 
     [TestCase("", "Title", "Body", "A feed id is required.")]
@@ -169,9 +168,10 @@ public class FeedComponentServiceTests
             "Company Forum",
             true));
 
-        Assert.That(store.Contents, Has.Count.EqualTo(2));
-        Assert.That(store.Contents.Single(c => c.Name == "CompanyNews").Title, Is.EqualTo("News Feed"));
-        Assert.That(store.Contents.Single(c => c.Name == "CompanyForum").Title, Is.EqualTo("Company Forum"));
+        Assert.That(store.FeedContents, Has.Count.EqualTo(1));
+        Assert.That(store.DiscussionContents, Has.Count.EqualTo(1));
+        Assert.That(store.FeedContents.Single().Title, Is.EqualTo("News Feed"));
+        Assert.That(store.DiscussionContents.Single().Title, Is.EqualTo("Company Forum"));
     }
 
     [Test]
@@ -179,10 +179,9 @@ public class FeedComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateFeedService(store);
-        await store.CreateContentAsync(new Content.Content
+        await store.CreateContainerAsync(new FeedContent
         {
             Name = "CompanyNews",
-            ContentType = ContentTypes.FeedContainer,
             Title = "News Feed"
         });
 
@@ -192,7 +191,7 @@ public class FeedComponentServiceTests
             "Hello from the feed.",
             " Safety, safety, Facilities ");
 
-        Assert.That(post.PostLabels, Has.Count.EqualTo(2));
+        Assert.That(post.Labels, Has.Count.EqualTo(2));
         Assert.That(store.Labels.Select(label => label.NormalizedName), Is.EquivalentTo(new[] { "SAFETY", "FACILITIES" }));
         Assert.That(store.Labels.Select(label => label.Slug), Does.Contain("safety"));
         Assert.That(store.Labels.Select(label => label.Slug), Does.Contain("facilities"));
@@ -228,37 +227,34 @@ public class FeedComponentServiceTests
 
         Assert.That(feedPost.ContainerId, Is.EqualTo(feed.Container!.Id));
         Assert.That(forumPost.ContainerId, Is.EqualTo(forum.Container!.Id));
-        Assert.That(feedPost.PostType, Is.EqualTo("post"));
-        Assert.That(forumPost.PostType, Is.EqualTo("thread"));
+        Assert.That(feedPost.Discriminator, Is.EqualTo("feed_entry"));
+        Assert.That(forumPost.Discriminator, Is.EqualTo("topic"));
         Assert.That(store.Labels, Has.Count.EqualTo(1));
-        Assert.That(feedPost.PostLabels.Single().LabelId, Is.EqualTo(forumPost.PostLabels.Single().LabelId));
+        Assert.That(feedPost.Labels.Single().LabelId, Is.EqualTo(forumPost.Labels.Single().LabelId));
     }
 
     [Test]
-    public async Task StoreCreatePostAsync_InfersPostTypeFromContainerAndContent()
+    public async Task CreatePostAsync_InfersDiscriminatorFromContainer()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var feed = await store.CreateContentAsync(new Content.Content
-        {
-            Name = "CompanyNews",
-            ContentType = ContentTypes.FeedContainer,
-            Title = "News Feed"
-        });
-        var forum = await store.CreateContentAsync(new Content.Content
-        {
-            Name = "MaintenanceForum",
-            ContentType = ContentTypes.ForumContainer,
-            Title = "Maintenance Forum"
-        });
-        var contentId = Guid.NewGuid();
+        var componentService = new ComponentService(store);
+        var feedService = new FeedComponentService(componentService, store);
+        var forumService = new ForumComponentService(componentService);
 
-        var feedPost = await store.CreatePostAsync(feed.Id, "Feed item", "Body", []);
-        var forumThread = await store.CreatePostAsync(forum.Id, "Thread", "Body", []);
-        var comment = await store.CreatePostAsync(feed.Id, "Comment", "Body", [], contentId: contentId);
+        await feedService.ResolveFeedAsync(new FeedComponentRequest(
+            "CompanyNews",
+            "News Feed",
+            true));
+        await forumService.ResolveForumAsync(new ForumComponentRequest(
+            "MaintenanceForum",
+            "Maintenance Forum",
+            true));
 
-        Assert.That(feedPost.PostType, Is.EqualTo("post"));
-        Assert.That(forumThread.PostType, Is.EqualTo("thread"));
-        Assert.That(comment.PostType, Is.EqualTo("comment"));
+        var feedPost = await feedService.CreatePostAsync("CompanyNews", "Feed item", "Body");
+        var forumThread = await forumService.CreateThreadAsync("MaintenanceForum", "Thread", "Body");
+
+        Assert.That(feedPost.Discriminator, Is.EqualTo("feed_entry"));
+        Assert.That(forumThread.Discriminator, Is.EqualTo("topic"));
     }
 
     private static FeedComponentService CreateFeedService(InMemoryWorkplaceIqStore store)

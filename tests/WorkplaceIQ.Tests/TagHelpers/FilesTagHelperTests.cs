@@ -5,7 +5,6 @@ using WorkplaceIQ.AspNet.TagHelpers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
-using WorkplaceIQ.Posts;
 using WorkplaceIQ.Tests.TestDoubles;
 
 namespace WorkplaceIQ.Tests.TagHelpers;
@@ -17,24 +16,23 @@ public class FilesTagHelperTests
     {
         var contentId = Guid.NewGuid();
         var service = new RecordingFileComponentService(new FileComponentResult(
-            new Content.Content
+            new FolderContent
             {
                 Id = Guid.NewGuid(),
                 Name = "HRDocs",
-                ContentType = ContentTypes.FileContainer,
                 Title = "HR Documents"
             },
             [
                 new FileObject(
-                    new Content.Content
+                    new ContentItem
                     {
                         Id = contentId,
                         Title = "Leave Policy",
                         Body = "Annual leave rules",
-                        UpdatedAt = new DateTime(2026, 6, 18, 0, 0, 0).ToUniversalTime(),
-                        ContentLabels =
+                        ModifiedAt = DateTime.SpecifyKind(new DateTime(2026, 6, 18, 0, 0, 0), DateTimeKind.Utc),
+                        Labels =
                         [
-                            new ContentLabel
+                            new ContentItemLabel
                             {
                                 Label = new Label
                                 {
@@ -44,19 +42,11 @@ public class FilesTagHelperTests
                                     Color = "#2563eb"
                                 }
                             }
-                        ],
-                        Posts =
-                        [
-                            new Post
-                            {
-                                PostType = PostTypes.Comment,
-                                Body = "Reviewed"
-                            }
                         ]
                     },
-                    new FileRecord
+                    new ContentFile
                     {
-                        ContentId = contentId,
+                        Id = contentId,
                         FileName = "Leave Policy.pdf",
                         ContentType = "application/pdf",
                         SizeBytes = 2048,
@@ -92,18 +82,16 @@ public class FilesTagHelperTests
         Assert.That(html, Does.Contain("data-iq-action=\"edit\""));
         Assert.That(html, Does.Contain("data-iq-action=\"delete\""));
         Assert.That(html, Does.Contain("#HR"));
-        Assert.That(html, Does.Contain("Reviewed"));
     }
 
     [Test]
     public async Task ProcessAsync_RendersEmptyStateWhenFilesLibraryHasNoFiles()
     {
         var service = new RecordingFileComponentService(new FileComponentResult(
-            new Content.Content
+            new FolderContent
             {
                 Id = Guid.NewGuid(),
                 Name = "ITDocs",
-                ContentType = ContentTypes.FileContainer,
                 Title = "IT Documents"
             },
             [],
@@ -126,22 +114,21 @@ public class FilesTagHelperTests
     public async Task ProcessAsync_EncodesFileContent()
     {
         var service = new RecordingFileComponentService(new FileComponentResult(
-            new Content.Content
+            new FolderContent
             {
                 Id = Guid.NewGuid(),
                 Name = "HRDocs",
-                ContentType = ContentTypes.FileContainer,
                 Title = "<HR>"
             },
             [
                 new FileObject(
-                    new Content.Content
+                    new ContentItem
                     {
                         Id = Guid.NewGuid(),
                         Title = "<Policy>",
                         Body = "Use <iq-files>"
                     },
-                    new FileRecord
+                    new ContentFile
                     {
                         FileName = "policy.pdf",
                         ContentType = "application/pdf",

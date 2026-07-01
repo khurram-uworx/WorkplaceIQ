@@ -1,10 +1,10 @@
-using WorkplaceIQ.Posts;
+using WorkplaceIQ.Content;
 
 namespace WorkplaceIQ.Components;
 
 public sealed record ComponentResult(
-    Content.Content? Container,
-    IReadOnlyList<Post> Posts,
+    Container? Container,
+    IReadOnlyList<ContentItem> Items,
     bool Created,
     bool Missing,
     string DisplayTitle);

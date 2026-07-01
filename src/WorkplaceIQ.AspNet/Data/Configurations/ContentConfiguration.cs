@@ -7,17 +7,16 @@ public sealed class ContentConfiguration : IEntityTypeConfiguration<Content.Cont
 {
     public void Configure(EntityTypeBuilder<Content.Content> entity)
     {
-        entity.HasIndex(c => c.Name).IsUnique();
-        entity.HasIndex(c => c.ContentType);
-        entity.HasIndex(c => c.ParentId);
-        entity.HasIndex(c => c.Status);
+        entity.ToTable("Content");
+        entity.UseTptMappingStrategy();
+
+        entity.HasKey(c => c.Id);
 
         entity
-            .HasOne(c => c.Parent)
-            .WithMany(c => c.Children)
-            .HasForeignKey(c => c.ParentId)
-            .IsRequired(false)
-            .OnDelete(DeleteBehavior.Restrict);
+            .HasMany(c => c.ContentLabels)
+            .WithOne(cl => cl.Content)
+            .HasForeignKey(cl => cl.ContentId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         entity
             .HasMany(c => c.SourceRelationships)

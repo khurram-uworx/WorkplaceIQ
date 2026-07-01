@@ -5,7 +5,6 @@ using WorkplaceIQ.AspNet.TagHelpers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Feeds;
 using WorkplaceIQ.Labels;
-using WorkplaceIQ.Posts;
 using WorkplaceIQ.Tests.TestDoubles;
 
 namespace WorkplaceIQ.Tests.TagHelpers;
@@ -16,22 +15,21 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_ResolvesFeedByIdAndRendersTitleAndPosts()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Content.Content
+            new FeedContent
             {
                 Id = Guid.NewGuid(),
                 Name = "CompanyNews",
-                ContentType = ContentTypes.FeedContainer,
                 Title = "News Feed"
             },
             [
-                new Post
+                new ContentItem
                 {
                     ContainerId = Guid.NewGuid(),
                     Title = "Quarterly update",
                     Body = "Results are ready.",
-                    PostLabels =
+                    Labels =
                     [
-                        new PostLabel
+                        new ContentItemLabel
                         {
                             Label = new Label
                             {
@@ -44,7 +42,6 @@ public class FeedTagHelperTests
                     ]
                 }
             ],
-            [],
             false,
             false,
             "News Feed"));
@@ -76,14 +73,12 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_RendersEmptyStateWhenFeedHasNoPosts()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Content.Content
+            new FeedContent
             {
                 Id = Guid.NewGuid(),
                 Name = "CompanyNews",
-                ContentType = ContentTypes.FeedContainer,
                 Title = "News Feed"
             },
-            [],
             [],
             false,
             false,
@@ -106,22 +101,21 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_EncodesTitleAndPostContent()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Content.Content
+            new FeedContent
             {
                 Id = Guid.NewGuid(),
                 Name = "CompanyNews",
-                ContentType = ContentTypes.FeedContainer,
                 Title = "<News>"
             },
             [
-                new Post
+                new ContentItem
                 {
                     ContainerId = Guid.NewGuid(),
                     Title = "<Quarterly>",
                     Body = "Use <iq-feed>",
-                    PostLabels =
+                    Labels =
                     [
-                        new PostLabel
+                        new ContentItemLabel
                         {
                             Label = new Label
                             {
@@ -133,7 +127,6 @@ public class FeedTagHelperTests
                     ]
                 }
             ],
-            [],
             false,
             false,
             "<News>"));
@@ -162,16 +155,14 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_RendersContentItemsInFeed()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Content.Content
+            new FeedContent
             {
                 Id = Guid.NewGuid(),
                 Name = "PowerOutages",
-                ContentType = ContentTypes.FeedContainer,
                 Title = "Power Outages"
             },
-            [],
             [
-                new Content.Content
+                new ContentItem
                 {
                     Title = "Generator 3 outage",
                     Body = "Generator 3 lost power."
@@ -199,16 +190,14 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_SystemManagedFeedDisablesMutationActionsButAllowsCommentAndLabel()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Content.Content
+            new FeedContent
             {
                 Id = Guid.NewGuid(),
                 Name = "PowerOutages",
-                ContentType = ContentTypes.FeedContainer,
                 Title = "Power Outages"
             },
-            [],
             [
-                new Content.Content
+                new ContentItem
                 {
                     Title = "Generator 3 outage",
                     Body = "Generator 3 lost power."
@@ -245,21 +234,19 @@ public class FeedTagHelperTests
     public async Task ProcessAsync_DisableAttributesRemoveSpecificInteractions()
     {
         var service = new RecordingFeedComponentService(new FeedComponentResult(
-            new Content.Content
+            new FeedContent
             {
                 Id = Guid.NewGuid(),
                 Name = "CompanyNews",
-                ContentType = ContentTypes.FeedContainer,
                 Title = "News Feed"
             },
             [
-                new Post
+                new ContentItem
                 {
                     Title = "Quarterly update",
                     Body = "Results are ready."
                 }
             ],
-            [],
             false,
             false,
             "News Feed"));

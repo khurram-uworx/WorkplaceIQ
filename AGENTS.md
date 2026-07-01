@@ -59,7 +59,7 @@ The repo may use the latest installed .NET SDK, including preview SDKs, while pr
 
 ## Domain Boundaries
 
-WorkplaceIQ is a metadata-driven content platform — containers, content, posts, labels, metadata, and relationships. It is NOT a generic CMS, a chat UI, or a data pipeline framework.
+WorkplaceIQ is a metadata-driven content platform — containers, content items, labels, and relationships. It is NOT a generic CMS, a chat UI, or a data pipeline framework.
 
 Forbidden: custom LLM clients, custom embedding pipelines, custom DI containers, custom vector databases.
 
@@ -71,9 +71,12 @@ ADRs should describe **what** the system does at an architectural level and **wh
 
 ### Existing ADRs
 
-| ADR | Topic |
-|-----|-------|
-| [Library-Storage-PgVector-Connector-01](docs/adr/Library-Storage-PgVector-Connector-01.md) | SK PgVector connector & Npgsql version compatibility |
+| ADR | Topic | Status |
+|-----|-------|--------|
+| [01-Library-Storage-PgVector-Connector](docs/adr/01-Library-Storage-PgVector-Connector.md) | SK PgVector connector & Npgsql version compatibility | Landed |
+| [02-Domain-Content-Modeling](docs/adr/02-Domain-Content-Modeling.md) | Unified polymorphic content model (TPT containers, standalone ContentItem) | Landed |
+| [03-ADR-UI-DualLayer](docs/adr/03-ADR-UI-DualLayer.md) | Dual UI Layer — Tag Helpers & Dedicated Controllers | Next |
+| [04-Metrics-Platform](docs/adr/04-Metrics-Platform.md) | OpenTelemetry-driven metrics platform | Future |
 
 ## DI Conventions
 
@@ -91,7 +94,7 @@ Provider selection via `Storage:Provider` in `appsettings.json`:
 - `sqlserver` — `UseSqlServer` + `SqlServerVectorStore`
 - `inmemory` — `UseInMemoryDatabase` + `InMemoryVectorStore`
 
-See [ADR Library-Storage-PgVector-Connector-01](docs/adr/Library-Storage-PgVector-Connector-01.md) for known compatibility notes on the PgVector/SK connector.
+See [ADR-01 Library-Storage-PgVector-Connector](docs/adr/01-Library-Storage-PgVector-Connector.md) for known compatibility notes on the PgVector/SK connector.
 
 ## Code Style
 
@@ -117,9 +120,8 @@ src/
 
 ## Common Pitfalls
 
-- `Files.FileRecord` conflicts with `WorkplaceIQ.AspNet.Files` namespace — use fully-qualified `WorkplaceIQ.Files.FileRecord` in `WorkplaceIqDbContext`.
 - `EfWorkplaceIqStore` uses `IDbContextFactory<WorkplaceIqDbContext>` — do not inject `WorkplaceIqDbContext` directly into services.
-- The SK PgVector connector (`Microsoft.SemanticKernel.Connectors.PgVector`) may have Npgsql version compatibility issues at runtime — see [ADR](docs/adr/Library-Storage-PgVector-Connector-01.md).
+- The SK PgVector connector (`Microsoft.SemanticKernel.Connectors.PgVector`) may have Npgsql version compatibility issues at runtime — see [ADR](docs/adr/01-Library-Storage-PgVector-Connector.md).
 
 ## Testing
 

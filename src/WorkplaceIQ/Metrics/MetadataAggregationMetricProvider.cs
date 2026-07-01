@@ -1,4 +1,5 @@
 using System.Text.Json;
+using WorkplaceIQ.Content;
 
 namespace WorkplaceIQ.Metrics;
 
@@ -43,16 +44,16 @@ public sealed class MetadataAggregationMetricProvider(
             .ToList();
     }
 
-    private static double? ExtractFieldValue(Content.Content item, string fieldName)
+    private static double? ExtractFieldValue(ContentItem item, string fieldName)
     {
-        if (string.IsNullOrWhiteSpace(item.MetadataJson))
+        if (string.IsNullOrWhiteSpace(item.ContentData))
         {
             return null;
         }
 
         try
         {
-            using var doc = JsonDocument.Parse(item.MetadataJson);
+            using var doc = JsonDocument.Parse(item.ContentData);
             if (!doc.RootElement.TryGetProperty(fieldName, out var element))
             {
                 return null;

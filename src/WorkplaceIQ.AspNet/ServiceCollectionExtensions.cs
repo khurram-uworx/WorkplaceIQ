@@ -30,7 +30,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFileComponentService, FileComponentService>();
         services.AddScoped<IEntityComponentService, EntityComponentService>();
         services.AddScoped<IFileObjectStorage, S3FileObjectStorage>();
-        services.AddScoped<IContentService, ContentService>();
+        services.AddScoped<IContainerService, ContainerService>();
+        services.AddScoped<IContentItemService, ContentItemService>();
         services.AddScoped<IMetricService, MetricService>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider, ContentCountMetricProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IMetricProvider>(

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Labels;
-using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Web.Controllers;
 
@@ -19,19 +19,24 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
             return RedirectToLocal(returnUrl);
         }
 
-        var item = await store.GetContentByIdAsync(itemId);
+        var item = await store.GetItemByIdAsync(itemId);
         if (item is null)
         {
             return RedirectToLocal(returnUrl);
         }
 
-        await store.CreatePostAsync(
-            item.ParentId!.Value,
-            "Comment",
-            body.Trim(),
-            [],
-            contentId: item.Id,
-            postType: PostTypes.Comment);
+        var now = DateTime.UtcNow;
+        var comment = new ContentItem
+        {
+            ContainerId = item.ContainerId,
+            Discriminator = "comment",
+            Title = "Comment",
+            Body = body.Trim(),
+            Status = "active",
+            CreatedAt = now,
+            ModifiedAt = now
+        };
+        await store.CreateItemAsync(comment);
 
         TempData["ItemActionMessage"] = "Comment added.";
         return RedirectToLocal(returnUrl);
@@ -56,7 +61,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
         }
         else if (itemType == "post")
         {
-            await store.AddLabelToPostAsync(itemId, parsed);
+            await store.AddLabelToItemAsync(itemId, parsed);
         }
 
         TempData["ItemActionMessage"] = "Label added.";
@@ -78,23 +83,24 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
 
         if (itemType == "content")
         {
-            var item = await store.GetContentByIdAsync(itemId);
+            var item = await store.GetItemByIdAsync(itemId);
             if (item is not null)
             {
                 item.Title = title.Trim();
                 item.Body = body?.Trim();
-                item.UpdatedAt = DateTime.UtcNow;
-                await store.UpdateContentAsync(item);
+                item.ModifiedAt = DateTime.UtcNow;
+                await store.UpdateItemAsync(item);
             }
         }
         else if (itemType == "post")
         {
-            var post = await store.GetPostByIdAsync(itemId);
-            if (post is not null)
+            var item = await store.GetItemByIdAsync(itemId);
+            if (item is not null)
             {
-                post.Title = title.Trim();
-                post.Body = body?.Trim() ?? string.Empty;
-                await store.UpdatePostAsync(post);
+                item.Title = title.Trim();
+                item.Body = body?.Trim();
+                item.ModifiedAt = DateTime.UtcNow;
+                await store.UpdateItemAsync(item);
             }
         }
 
@@ -108,14 +114,7 @@ public sealed class ContentController(IWorkplaceIqStore store) : Controller
         Guid itemId,
         string? returnUrl)
     {
-        if (itemType == "content")
-        {
-            await store.DeleteContentAsync(itemId);
-        }
-        else if (itemType == "post")
-        {
-            await store.DeletePostAsync(itemId);
-        }
+        await store.DeleteItemAsync(itemId);
 
         TempData["ItemActionMessage"] = "Item deleted.";
         return RedirectToLocal(returnUrl);

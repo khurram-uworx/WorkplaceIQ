@@ -5,7 +5,6 @@ using WorkplaceIQ.AspNet.TagHelpers;
 using WorkplaceIQ.Content;
 using WorkplaceIQ.Forums;
 using WorkplaceIQ.Labels;
-using WorkplaceIQ.Posts;
 using WorkplaceIQ.Tests.TestDoubles;
 
 namespace WorkplaceIQ.Tests.TagHelpers;
@@ -16,22 +15,21 @@ public class ForumTagHelperTests
     public async Task ProcessAsync_ResolvesForumByIdAndRendersTitleThreadsAndLabels()
     {
         var service = new RecordingForumComponentService(new ForumComponentResult(
-            new Content.Content
+            new DiscussionContent
             {
                 Id = Guid.NewGuid(),
                 Name = "MaintenanceForum",
-                ContentType = ContentTypes.ForumContainer,
                 Title = "Maintenance Forum"
             },
             [
-                new Post
+                new ContentItem
                 {
                     ContainerId = Guid.NewGuid(),
                     Title = "Parking lights",
                     Body = "Level two needs inspection.",
-                    PostLabels =
+                    Labels =
                     [
-                        new PostLabel
+                        new ContentItemLabel
                         {
                             Label = new Label
                             {
@@ -73,11 +71,10 @@ public class ForumTagHelperTests
     public async Task ProcessAsync_RendersEmptyStateWhenForumHasNoPosts()
     {
         var service = new RecordingForumComponentService(new ForumComponentResult(
-            new Content.Content
+            new DiscussionContent
             {
                 Id = Guid.NewGuid(),
                 Name = "MaintenanceForum",
-                ContentType = ContentTypes.ForumContainer,
                 Title = "Maintenance Forum"
             },
             [],
@@ -102,22 +99,21 @@ public class ForumTagHelperTests
     public async Task ProcessAsync_EncodesTitleThreadContentAndLabels()
     {
         var service = new RecordingForumComponentService(new ForumComponentResult(
-            new Content.Content
+            new DiscussionContent
             {
                 Id = Guid.NewGuid(),
                 Name = "MaintenanceForum",
-                ContentType = ContentTypes.ForumContainer,
                 Title = "<Forum>"
             },
             [
-                new Post
+                new ContentItem
                 {
                     ContainerId = Guid.NewGuid(),
                     Title = "<Thread>",
                     Body = "Use <iq-forum>",
-                    PostLabels =
+                    Labels =
                     [
-                        new PostLabel
+                        new ContentItemLabel
                         {
                             Label = new Label
                             {

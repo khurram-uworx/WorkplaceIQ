@@ -154,16 +154,14 @@ public class FeedbackService(
         if (item?.RssItem is null)
             return (false, null);
 
-        var content = item.RssItem;
-        if (content.RetryCount >= 5)
+        if (item.AttemptCount >= 5)
             return (false, item);
 
-        content.RetryCount++;
-        await store.UpdateContentAsync(content, ct);
+        item.AttemptCount++;
+        await store.UpdateClassifiedItemAsync(item, ct);
 
-        if (content.RetryCount >= 5)
+        if (item.AttemptCount >= 5)
         {
-            item.AttemptCount = content.RetryCount;
             item.HallucinatedSignal = null;
             await store.UpdateClassifiedItemAsync(item, ct);
             return (true, item);
@@ -173,7 +171,7 @@ public class FeedbackService(
         await store.DeleteClassifiedItemAsync(classifiedId, ct);
 
         if (await collection.CollectionExistsAsync(ct))
-            await collection.DeleteAsync(content.Id.ToString(), ct);
+            await collection.DeleteAsync(item.RssItem.Id.ToString(), ct);
 
         return (true, null);
     }

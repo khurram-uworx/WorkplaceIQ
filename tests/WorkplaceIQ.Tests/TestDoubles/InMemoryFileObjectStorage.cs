@@ -1,5 +1,6 @@
 namespace WorkplaceIQ.Tests.TestDoubles;
 
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Files;
 
 internal sealed class InMemoryFileObjectStorage : IFileObjectStorage
@@ -39,17 +40,17 @@ internal sealed class InMemoryFileObjectStorage : IFileObjectStorage
     }
 
     public Task<Stream> OpenReadAsync(
-        FileRecord fileRecord,
+        ContentFile contentFile,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<Stream>(new MemoryStream(objects[fileRecord.ObjectKey]));
+        return Task.FromResult<Stream>(new MemoryStream(objects[contentFile.ObjectKey]));
     }
 
     public Task DeleteAsync(
-        FileRecord fileRecord,
+        ContentFile contentFile,
         CancellationToken cancellationToken = default)
     {
-        objects.Remove(fileRecord.ObjectKey);
+        objects.Remove(contentFile.ObjectKey);
         return Task.CompletedTask;
     }
 }

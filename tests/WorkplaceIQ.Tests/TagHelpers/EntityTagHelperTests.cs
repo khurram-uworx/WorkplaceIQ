@@ -14,22 +14,16 @@ public class EntityTagHelperTests
     [Test]
     public async Task ProcessAsync_ResolvesEntityListAndRendersEntities()
     {
-        var target = new Content.Content
+        var entity = new ContentItem
         {
             Id = Guid.NewGuid(),
-            ContentType = "Machine",
-            Title = "Line 1"
-        };
-        var entity = new Content.Content
-        {
-            Id = Guid.NewGuid(),
-            ContentType = "Machine",
+            Discriminator = "Machine",
             Title = "Press 12",
-            Description = "Hydraulic press",
-            MetadataJson = """{"floor":"A"}""",
-            ContentLabels =
+            Body = "Hydraulic press",
+            ContentData = """{"floor":"A"}""",
+            Labels =
             [
-                new ContentLabel
+                new ContentItemLabel
                 {
                     Label = new Label
                     {
@@ -38,21 +32,12 @@ public class EntityTagHelperTests
                         Slug = "critical"
                     }
                 }
-            ],
-            SourceRelationships =
-            [
-                new ContentRelationship
-                {
-                    RelationshipType = "part of",
-                    TargetContent = target
-                }
             ]
         };
         var service = new RecordingEntityComponentService(new EntityComponentResult(
-            new Content.Content
+            new GroupContent
             {
                 Name = "Machines",
-                ContentType = ContentTypes.EntityContainer,
                 Title = "Machines"
             },
             [entity],
@@ -80,26 +65,23 @@ public class EntityTagHelperTests
         Assert.That(html, Does.Contain("<h3 class=\"iq-entity__title\">Press 12</h3>"));
         Assert.That(html, Does.Contain("<p class=\"iq-entity__description\">Hydraulic press</p>"));
         Assert.That(html, Does.Contain("#Critical"));
-        Assert.That(html, Does.Contain("part of"));
-        Assert.That(html, Does.Contain("Line 1"));
     }
 
     [Test]
     public async Task ProcessAsync_EncodesEntityContent()
     {
         var service = new RecordingEntityComponentService(new EntityComponentResult(
-            new Content.Content
+            new GroupContent
             {
                 Name = "Machines",
-                ContentType = ContentTypes.EntityContainer,
                 Title = "<Machines>"
             },
             [
-                new Content.Content
+                new ContentItem
                 {
-                    ContentType = "<Machine>",
+                    Discriminator = "<Machine>",
                     Title = "<Press>",
-                    Description = "Use <iq-entity>"
+                    Body = "Use <iq-entity>"
                 }
             ],
             false,
@@ -128,10 +110,9 @@ public class EntityTagHelperTests
     public async Task ProcessAsync_RendersEmptyState()
     {
         var service = new RecordingEntityComponentService(new EntityComponentResult(
-            new Content.Content
+            new GroupContent
             {
                 Name = "Machines",
-                ContentType = ContentTypes.EntityContainer,
                 Title = "Machines"
             },
             [],
