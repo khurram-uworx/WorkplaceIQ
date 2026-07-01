@@ -4,14 +4,12 @@
 
 ## Context
 
-WorkplaceIQ is a metadata-driven content platform. Every domain entity — Discussions, Files, Feeds, and their child items (posts, file records, feed entries) — shares common infrastructure needs:
+WorkplaceIQ is a metadata-driven content platform. Every domain entity — Discussions, Files, Feeds, Groups, and their child items (posts, file records, feed entries, members) — shares common infrastructure needs:
 
 - **Labels** — tag-based categorization, cross-cutting across all entity types
-- **Metadata** — key-value pairs for extensible attributes per entity
-- **Metrics** — view counts, activity timestamps, engagement data
 - **Vector indexing** — semantic search and SignalFlow classification
 
-Without a unified model, every new entity type requires duplicating the label/metadata/metric infrastructure, leading to schema proliferation and inconsistent query patterns. A polymorphic content model centralizes these concerns under a single abstraction.
+Without a unified model, every new entity type requires duplicating the label infrastructure, leading to schema proliferation and inconsistent query patterns. A polymorphic content model centralizes these concerns under a single abstraction.
 
 The target audience is small-to-mid enterprises (2–50 people) where Sharepoint / M365 do not yet make economic sense. Content volumes are modest; query performance considerations favor simplicity over denormalization.
 
@@ -19,79 +17,87 @@ The target audience is small-to-mid enterprises (2–50 people) where Sharepoint
 
 ## Decision
 
-**Adopt a unified polymorphic content model** with two abstract levels (`Content` and `ContentItem`), a concrete `Container` abstraction for grouping and infrastructure ownership, and per-type friendly integer identifiers alongside canonical GUIDs.
+**Adopt a unified polymorphic content model** with two abstract levels (`Content` and `Container`), a standalone `ContentItem` table for child entities, and GUID-only identity for all entities.
 
 ### Entity Hierarchy
 
 ```
-Content                              (GUID PK, Labels, Metadata, Metrics)
-├── Container : Content              (per-type int BusinessId, VectorStore ref, permission scope, children)
-│   ├── Discussion
-│   ├── FileFolder
-│   └── Feed
-└── ContentItem : Content            (GUID FK → parent Container)
-    ├── TopicPost
-    ├── FileRecord
-    └── FeedEntry
+Content (abstract)                  (GUID PK, Labels)
+├── Container : Content             (VectorStore ref, permission scope, children)
+│   ├── DiscussionContent
+│   ├── FolderContent
+│   ├── FeedContent
+│   └── GroupContent                (+ GroupType)
+└── [not used as base — just TPT base table for containers]
+
+ContentItem (standalone)            (GUID PK, ContainerId FK → Content.Id, Discriminator)
+├── discriminator = "topic"
+├── discriminator = "feed_entry"
+├── discriminator = "file"          (+ optional ContentFile child row)
+└── discriminator = "member"
 ```
 
-### 1. Content (Abstract Base)
+### 1. Content (Abstract Base — shared TPT base for containers only)
 
-Every entity in the system is a `Content`. The `Contents` table holds:
+The `Contents` table is the TPT base for all container types. It is NOT the base for `ContentItem` — items live in a separate standalone table.
 
 | Column | Type | Purpose |
 |---|---|---|
 | `Id` | GUID PK | Universal identifier, no collisions, merge-safe |
-| `Discriminator` | string | Identifies the concrete type (Discussion, TopicPost, etc.) |
 | `CreatedAt`, `CreatedBy` | ... | Audit trail |
 | `ModifiedAt`, `ModifiedBy` | ... | Audit trail |
 
-All `Contents` rows may have associated labels, metadata, and metrics via separate link tables (`ContentLabels`, `ContentMetadata`, `ContentMetrics`). This avoids table-width bloat on the core `Contents` table.
+Container-level labels are tracked via the `ContentLabels` link table (ContentId FK → Content.Id).
 
-### 2. Container (Concrete Subclass of Content)
+### 2. Container (Abstract Subclass of Content)
 
 `Container` represents entities that own children, manage a vector collection, and define a permission boundary.
 
 | Column | Type | Purpose |
 |---|---|---|
 | `Id` | GUID PK (inherited from Content) | Canonical identity |
-| `BusinessId` | int (nullable) | Per-type sequential friendly ID for URLs (`/Discussions/View/1`) |
 | `VectorCollectionName` | string (nullable) | Name of the vector store collection for semantic search |
-| `Name` | string | Human-readable label |
-| `Description` | string | Optional description |
-
-The `BusinessId` is scoped per concrete type — `Discussion` IDs 1, 2, 3 and `FileFolder` IDs 1, 2, 3 coexist as independent sequences. This gives clean URLs without global sequence coupling. The `BusinessId` is a friendly identifier, not an authoritative FK — move/merge operations treat it as a stable label that can be reassigned.
+| `Name` | string | Unique, URL-safe slug |
+| `Title` | string | Display title |
+| `Description` | string (nullable) | Optional description |
+| `RendererKey` | string (nullable) | Key for selecting component renderer (e.g. `forum`, `files`) |
+| `Status` | string | `active`, `archived` |
+| `SettingsJson` | string (nullable) | JSON configuration blob |
+| `IsSystemGenerated` | bool | Flag for auto-created system containers |
 
 Vector indexing operates at the Container level. All ContentItems within a Container are indexed into the same collection.
 
-### 3. ContentItem (Abstract Subclass of Content)
+### 3. ContentItem (Standalone Table — Child Items)
 
-`ContentItem` represents entities that belong to a parent Container. A single `ContentItems` table serves all item types.
+`ContentItem` represents entities that belong to a parent Container. It is **not** part of the `Content` TPT hierarchy — it is a standalone table with its own primary key and a `ContainerId` foreign key to `Content.Id`.
 
 | Column | Type | Purpose |
 |---|---|---|
-| `Id` | GUID PK (inherited from Content) | Canonical identity |
+| `Id` | GUID PK | Canonical identity (independent of Content PK sequence) |
 | `ContainerId` | GUID FK → Content.Id | Parent Container |
-| `Discriminator` | string | TopicPost, FileRecord, FeedEntry |
-| `BusinessId` | int (nullable) | Per-container sequential friendly ID for URLs |
-| `ContentData` | jsonb (optional) | Flexible payload for type-specific data |
+| `Discriminator` | string | `topic`, `feed_entry`, `file`, `member` |
+| `Name` | string | Short name (e.g., filename) |
+| `Title` | string | Display title |
+| `Body` | string (nullable) | Rich text body or description |
+| `AuthorUserId` | string (nullable) | External user identifier |
+| `Status` | string | `active`, `archived` |
+| `PublishedAt` | DateTime (nullable) | Publication timestamp |
+| `ContentData` | string (nullable) | Flexible payload for type-specific data (JSON text) |
+| `CreatedAt`, `CreatedBy` | ... | Audit trail |
+| `ModifiedAt`, `ModifiedBy` | ... | Audit trail |
 
-If a business entity needs additional structured columns (e.g., `FileRecord` with a file hash and storage path), it creates an optional child table with `Id = GUID FK → ContentItems.Id`. No polymorphism in the schema — just identity sharing.
+If a business entity needs additional structured columns (e.g., `file` with storage metadata), it creates an optional 1:1 child table with `Id = GUID FK → ContentItems.Id`. Currently only `ContentFile` is defined.
 
-The `BusinessId` is scoped per parent Container. Moving an item between containers copies the literal content (new GUID, new `BusinessId` under target container) and deletes the old row, all within a single transaction. This avoids ID reassignment complexity and gives move-as-copy-and-delete semantics that can later be extended to versioning or history.
+Item-level labels are tracked via `ContentItemLabels` (ContentItemId FK → ContentItems.Id).
 
-### 4. Labels, Metadata, Metrics (Infrastructure)
+### 4. Labels (Infrastructure)
 
-These are split per entity level to keep the hot `Contents` table lean:
+Labels are split per entity level to keep queries focused:
 
-- `ContentLabels`, `ContentMetadata`, `ContentMetrics` — for `Content`-level entities (including Containers)
-- `ContentItemLabels`, `ContentItemMetadata`, `ContentItemMetrics` — for `ContentItem`-level entities
+- `ContentLabels` — for Content-level entities (Containers only; link to `Content.Id`)
+- `ContentItemLabels` — for ContentItem-level entities (link to `ContentItems.Id`)
 
-The schema for each is identical; the split is purely to avoid index pressure from item-level data against container-level queries and vice versa.
-
-### 5. Orphan Cleanup
-
-A GUID row in `Contents` with no matching concrete-typed row (`Discussions`, `FileFolders`, etc.) is a data anomaly — it exists but is invisible in the business layer. This is rare and happens only from partial failures or bugs. A background job scans `Contents` by discriminator, checks for the existence of the corresponding type table row, and deletes orphans. Tolerated as an acceptable inconsistency given the target scale.
+The schema for each is the same (entity FK + LabelId FK); the split avoids index pressure from item-level labels against container-level queries and vice versa.
 
 ---
 
@@ -99,28 +105,28 @@ A GUID row in `Contents` with no matching concrete-typed row (`Discussions`, `Fi
 
 ### 1. Uniform extensibility
 
-Adding a new entity type (e.g., `EventCalendar`) requires only:
-- A new discriminator value
+Adding a new entity type requires only:
+- A new container type class (if top-level) or discriminator value (if child item)
 - One optional type-specific table if extra columns are needed
-- Labels, metadata, metrics, and vector indexing work automatically
+- Labels and vector indexing work automatically
 
-No new infrastructure tables, no new query patterns for cross-cutting concerns.
+No new infrastructure tables for cross-cutting concerns.
 
-### 2. GUID + Integer dual identity
+### 2. GUID-only identity
 
-GUIDs serve as the universal identity across the system — merge-safe, no rekeying, no collisions. Per-type integer sequences give clean, short, human-friendly URLs (`/Discussions/View/1`). The two never conflict because they serve different purposes: GUIDs are the canonical FK target; integers are presentation-friendly stable labels.
+GUIDs serve as the universal identity across the system — merge-safe, no rekeying, no collisions. Per-type or per-container integer sequences (`BusinessId`) were considered but not implemented because no caller or query currently requires them. They can be added later if URL-friendliness becomes a priority, using the same scoped-sequence approach described in alternatives.
 
 ### 3. Container as infrastructure boundary
 
-Vector store collections, permission scopes, and child management all belong to `Container`. This avoids polluting every `Content` row with nullable infrastructure columns. It also maps naturally to the domain: a Discussion owns its posts, a FileFolder owns its files, a Feed owns its entries.
+Vector store collections, permission scopes, and child management all belong to `Container`. This avoids polluting every `Content` row with nullable infrastructure columns. It also maps naturally to the domain: a DiscussionContent owns its posts, a FolderContent owns its files, a FeedContent owns its entries, a GroupContent owns its members.
 
-### 4. Copy-and-delete move semantics
+### 4. ContentItem as standalone table (not TPT child)
 
-Moving a `ContentItem` between containers via copy + delete avoids the thorny problem of reassigning per-container sequential IDs. The move is atomic in a transaction, and the old row is gone. If versioning is later desired, the copy step can instead mark old rows as archived.
+ContentItem is a standalone table with its own PK, not a subclass of Content. This avoids TPT join overhead on the hot item path and keeps the Content base table focused on containers only. The tradeoff is that cross-cutting queries spanning containers + items (e.g., "all content with label X") require two queries or a UNION — acceptable for the target scale.
 
 ### 5. Scale-appropriate pragmatism
 
-At 2–50 person deployments, none of the classic RDBMS scaling problems apply. Polymorphic joins are not a performance concern. Orphan cleanup is a safety net, not a hot path. The design optimizes for developer clarity and extensibility over denormalized query performance.
+At 2–50 person deployments, none of the classic RDBMS scaling problems apply. The design optimizes for developer clarity and extensibility over denormalized query performance.
 
 ---
 
@@ -128,18 +134,16 @@ At 2–50 person deployments, none of the classic RDBMS scaling problems apply. 
 
 ### Positive
 
-- **Single infrastructure pattern** — Labels, metadata, metrics work identically for all entity types. Developers do not re-implement tagging per feature.
+- **Single label infrastructure** — Labels work identically for containers and items via two link tables.
 - **Container-level vector indexing** — Collection lifecycle is tied to container lifecycle. No orphaned vector collections.
-- **Full-stack URL design** — GUIDs for API internals, integers for user-facing URLs. Both coexist without conflict.
-- **Schema minimalism** — `Contents` + `ContentItems` as the two core tables; type-specific tables are opt-in.
-- **Move without ID churn** — Copy-and-delete gives clean per-container sequences without reassignment logic.
+- **Schema minimalism** — `Contents` (TPT base for containers) + per-container tables + `ContentItems` + optional child tables.
+- **No orphan problem** — Since ContentItem is standalone, there is no orphan-row scenario that was a concern in the TPT-everything model.
 
 ### Negative
 
-- **Polymorphic joins** — Queries across the full content graph (e.g., "all content with label X") require `Contents` + discriminator-aware joins. Mitigated by target scale.
-- **Orphan rows** — `Contents` rows without corresponding business-entity rows are possible. Tolerated; cleaned by background job.
-- **Dual ID mental model** — Developers must understand that GUIDs are canonical and integers are presentation-friendly labels, not authoritative keys.
-- **Copy-and-delete ≠ true move** — If the old `BusinessId` is externally referenced (e.g., bookmarked URLs), the reference breaks. Acceptable for the target audience; mitigable via redirects later.
+- **ContentItem queries require join to Container** — Every item query must join or filter by `ContainerId`. Acceptable at target scale.
+- **Cross-cutting queries across containers + items need UNION** — e.g., "all entities with label Urgent" requires two passes.
+- **No integer-friendly URLs yet** — GUID-only means longer URLs. `BusinessId` can be added later if needed.
 
 ### Neutral
 
@@ -153,16 +157,18 @@ At 2–50 person deployments, none of the classic RDBMS scaling problems apply. 
 | Alternative | Rejected because |
 |---|---|
 | **Flat Content table with discriminator only** (no Container, no ContentItem) | No natural place for vector store / permission ownership; every query must filter by discriminator; no type-safe distinction between top-level and child entities without application logic |
-| **Single Label/Metadata/Metrics table for all entities** | Polymorphic FK (ContentId or ContentItemId) with check constraints prevents clean FK enforcement; query plans degrade due to nullable columns and OR predicates |
+| **ContentItem as TPT child of Content** | Would put containers and items in the same PK sequence; TPT join on every item query; risk of orphan rows; no clear benefit over standalone table |
+| **Single Label table for all entities** | Polymorphic FK prevents clean FK enforcement; query plans degrade due to nullable columns and OR predicates |
 | **Integer-only identity (no GUIDs)** | Prevents offline ID generation; merge/collision risk if data sources are combined; GUIDs are the canonical choice for distributed identity |
-| **True RDBMS inheritance (table-per-type)** | Complex query generation; EF Core TPT joins are expensive; no benefit over discriminator + opt-in child tables at this scale |
-| **Move via FK update (reassign parent)** | Breaks per-container `BusinessId` sequence; requires reassignment logic and risks duplicate IDs within the target container |
-| **No vector indexing on ContentItems (index Container only)** | Chosen as the starting point; individual item indexing can be added later without schema changes |
+| **Per-type per-container BusinessId** | Adding integer sequences would give cleaner URLs but adds complexity (max+1 per scope, move semantics). No caller currently needs it — deferred until a concrete requirement emerges |
+| **Move via FK update (reassign parent)** | Simpler than copy-and-delete but loses audit trail; not needed until move semantics are implemented |
 | **CQRS / event-sourced content store** | Unnecessary complexity for 2–50 person enterprises; adds eventual consistency, replay, and snapshot management overhead with no clear benefit |
 
 ---
 
 ## Related
 
-- [ADR Library-Storage-PgVector-Connector-01](docs/adr/Library-Storage-PgVector-Connector-01.md) — Vector store backend selection that Container-level indexing will use
+- [ADR-Storage-PgVector-Connector-01](docs/adr/01-Library-Storage-PgVector-Connector.md) — Vector store backend selection that Container-level indexing will use
+- [ADR-UI-DualLayer-03](docs/adr/03-ADR-UI-DualLayer.md) — UI rendering layer built on this content model
+- [ADR-Metrics-Platform-04](docs/adr/04-Metrics-Platform.md) — OpenTelemetry-driven metrics platform
 - `AGENTS.md` — Coding conventions for the project (primary constructors, sealed classes, DI patterns)

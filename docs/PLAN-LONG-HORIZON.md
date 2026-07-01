@@ -4,18 +4,35 @@
 
 ---
 
+## ADR Status
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| [ADR-01](docs/adr/01-Library-Storage-PgVector-Connector.md) | SK PgVector Connector & Npgsql Compatibility | **Landed in code** |
+| [ADR-02](docs/adr/02-Domain-Content-Modeling.md) | Unified Polymorphic Content Model | **Landed in code** |
+| [ADR-03](docs/adr/03-ADR-UI-DualLayer.md) | Dual UI Layer — Tag Helpers & Dedicated Controllers | **Next** |
+| [ADR-04](docs/adr/04-Metrics-Platform.md) | OpenTelemetry-Driven Metrics Platform | **Future** |
+
+---
+
 ## Done
 
-### Core Model
+### Core Model (ADR-02)
 
-- **Content** — `Content` entity with unique `Name`, hierarchical parent/children, `ContentType` discriminator, `Status` lifecycle, `MetadataJson`, `SearchText`, timestamps. Self-referencing FK (`ParentId`) with restrict delete.
-- **Post** — `Post` entity with `PostType` (post/thread/comment), optional `ContentId` parent, `AuthorUserId`, `IsSystemGenerated`, `MetadataJson`. FKs to Contents with restrict delete.
-- **Label** — `Label` with `Name`, `NormalizedName` (unique), `Slug`, `Color`, `Description`. Many-to-many via `ContentLabels` and `PostLabels` join tables.
-- **ContentRelationship** — Directed relationship between two content items with `RelationshipType` string and `MetadataJson`.
-- **FileRecord** — 1-to-1 with Content: `FileName`, `ContentType`, `SizeBytes`, `ChecksumSha256`, `StorageProvider`, `BucketName`, `ObjectKey`.
+- **Content** (abstract) — TPT base for all container types. `Id` (GUID PK), `CreatedAt`/`CreatedBy`/`ModifiedAt`/`ModifiedBy`.
+- **Container** (abstract) — extends `Content`. `Name`, `Title`, `Description`, `VectorCollectionName`, `RendererKey`, `Status`, `SettingsJson`, `IsSystemGenerated`. Children via `Items` collection.
+  - **DiscussionContent** — Forum/discussion container (RendererKey = `forum`).
+  - **FolderContent** — File library container.
+  - **FeedContent** — News/feed container.
+  - **GroupContent** — Entity directory container (+ `GroupType`).
+- **ContentItem** (standalone, sealed) — Own PK (`Guid`), `ContainerId` FK → `Content.Id`, `Discriminator` string (`topic`/`feed_entry`/`file`/`member`), `Name`, `Title`, `Body`, `AuthorUserId`, `Status`, `PublishedAt`, `ContentData` (JSON), timestamps.
+- **ContentFile** (sealed, 1:1 child of ContentItem) — File storage metadata: `FileName`, `ContentType`, `SizeBytes`, `ChecksumSha256`, `StorageProvider`, `BucketName`, `ObjectKey`. Replaces old `FileRecord`.
+- **Label** — `Name`, `NormalizedName` (unique), `Slug`, `Color`, `Description`. Many-to-many via `ContentLabels` (container-level) and `ContentItemLabels` (item-level).
+- **ContentRelationship** — Directed relationship between two `Content` rows with `RelationshipType` string.
 - **MetricDefinition** — Named metric with `ContainerType`, `InstrumentKind`, `Aggregation`, `SourceField`, `Unit`, `DisplayUnit`, `Description`.
-- **ContentTypes** constants — `FeedContainer`, `ForumContainer`, `FileContainer`, `EntityContainer`, `Directory`, `Dashboard`, `SystemFeed`, `KnowledgeBase`.
-- **PostTypes** constants — `Post`, `Thread`, `Comment`.
+- **ClassifiedItem** — One-per-ContentItem classification result with `SignalLabel`, `Score`, `Confidence`.
+- **ContentTypes** constants — `FeedContainer`, `ForumContainer`, `FileContainer`, `EntityContainer`.
+- **Discriminators** — `topic`, `feed_entry`, `file`, `member`.
 
 ### Business Concept Mapping
 
@@ -23,29 +40,30 @@ Business concepts map to container types through which component service is call
 
 | Concept | Service | Container Type | Children |
 |---------|---------|----------------|----------|
-| Feed / News / Incidents | `FeedComponentService` | `FeedContainer` | Content items + Posts |
-| Forum / Discussions | `ForumComponentService` | `ForumContainer` | Posts (type `thread`) |
-| File Library / Docs | `FileComponentService` | `FileContainer` | Content items + FileRecords |
-| Entity Directory | `EntityComponentService` | `EntityContainer` | Content items with user-defined ContentType |
+| Feed / News / Incidents | `FeedComponentService` | `FeedContent` | ContentItems (discriminator `feed_entry`) |
+| Forum / Discussions | `ForumComponentService` | `DiscussionContent` | ContentItems (discriminator `topic`) |
+| File Library / Docs | `FileComponentService` | `FolderContent` | ContentItems (discriminator `file` + optional ContentFile) |
+| Entity Directory | `EntityComponentService` | `GroupContent` | ContentItems (discriminator `member`) |
 
-The component ID (e.g., `"CompanyNews"`, `"Machines"`) is the `Content.Name` lookup key. Each service hard-codes its `ContentTypes.*` constant. Container children use user-supplied ContentType strings (e.g., `"Outage"`, `"Machine"`, `"Team"`). Post type inference: replies with `contentId` → `Comment`, forum containers → `Thread`, otherwise → `Post`.
+The component ID (e.g., `"CompanyNews"`, `"Machines"`) is the `Container.Name` lookup key. Each service hard-codes its container type. All child items share the `ContentItem` table with discriminator-based routing.
 
 ### Data Access
 
-- `IWorkplaceIqStore` (97 lines) — CRUD for Content, Posts, Files, ContentRelationships, Labels, MetricDefinitions. All async with `CancellationToken`.
-- `EfWorkplaceIqStore` (371 lines) — Full EF Core implementation in `WorkplaceIQ.AspNet`.
-- `WorkplaceIqDbContext` — 8 DbSets (`Contents`, `Posts`, `Labels`, `PostLabels`, `ContentLabels`, `ContentRelationships`, `FileRecords`, `MetricDefinitions`). Unique indexes on `Name`/`NormalizedName`. FK constraints with `Restrict` delete. Database created via `EnsureCreated()`.
+- `IWorkplaceIqStore` — Typed CRUD for containers, items, files, labels, classifications, relationships, metric definitions. All async with `CancellationToken`.
+- `EfWorkplaceIqStore` — EF Core implementation via `IDbContextFactory<WorkplaceIqDbContext>` for thread safety.
+- `WorkplaceIqDbContext` — TPT mapping for containers (`Contents` base + `DiscussionContents`/`FolderContents`/`FeedContents`/`GroupContents`), standalone `ContentItems` + `ContentFiles`, link tables (`ContentLabels`, `ContentItemLabels`, `ContentRelationships`), `ClassifiedItems`, `MetricDefinitions`. Database created via `EnsureCreated()`.
 
 ### Component Services
 
-All services follow the same pattern: resolve a container by `Name`, auto-provision if missing (dev mode), return typed results. Auto-provisioning creates the container Content record with the hard-coded ContainerType as both ContentType and RendererKey. It does not auto-create APIs, permissions, AI indexes, search, or dashboards.
+All services follow the same pattern: resolve a container by `Name`, auto-provision if missing (dev mode), return typed results. Auto-provisioning creates the container record with computed `RendererKey`. It does not auto-create APIs, permissions, AI indexes, search, or dashboards.
 
-- **FeedComponentService** — Resolves feed containers, returns posts + content items + labels. `CreatePostAsync()` with label parsing.
-- **ForumComponentService** — Thread-based posts. `CreateThreadAsync()` with initial post.
-- **FileComponentService** — File container resolution, file upload with `IFormFile`, labels, metadata.
-- **EntityComponentService** — Entity list/detail, entity creation with metadata/labels, relationships.
-- **ComponentService** — Generic container resolution used by all above.
-- **ContentService** — Thin wrapper over store for content CRUD with trimming.
+- **FeedComponentService** — Resolves `FeedContent` containers, returns items with discriminator `feed_entry`. `CreatePostAsync()` with label parsing.
+- **ForumComponentService** — Resolves `DiscussionContent` containers, threads via items with discriminator `topic`.
+- **FileComponentService** — Resolves `FolderContent` containers, file upload with `ContentItem` (discriminator `file`) + `ContentFile` child row.
+- **EntityComponentService** — Resolves `GroupContent` containers, entity list/detail with discriminator `member`.
+- **ComponentService** — Generic type-aware container resolution used by all above.
+- **ContainerService** — CRUD for containers (was `ContentService`).
+- **ContentItemService** — CRUD for items within a container (was part of `ContentService`).
 
 ### Tag Helpers
 
@@ -53,10 +71,10 @@ Six Tag Helpers registered via `@addTagHelper *, WorkplaceIQ.AspNet`. All use co
 
 | TagHelper | Attributes | Behavior |
 |-----------|------------|----------|
-| `FeedTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves feed container, renders posts/content with action buttons |
-| `ForumTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves forum container, renders threads |
-| `FilesTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves files container, renders file cards |
-| `EntityListTagHelper` | `id`, `title`, `type`, `system-managed`, `disable-*` | Resolves entity container, renders entity cards |
+| `FeedTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves `FeedContent` container, renders items with action buttons |
+| `ForumTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves `DiscussionContent` container, renders threads |
+| `FilesTagHelper` | `id`, `title`, `system-managed`, `disable-*` | Resolves `FolderContent` container, renders file cards |
+| `EntityListTagHelper` | `id`, `title`, `type`, `system-managed`, `disable-*` | Resolves `GroupContent` container, renders entity cards |
 | `EntityTagHelper` | `id`, `title`, `type`, `container` | Single entity detail with relationships |
 | `MetricTagHelper` | `name`, `source`, `content-type`, `source-field`, `window`, `unit`, `display-unit`, `container-type`, `container-id` | Builds `MetricRequest`, renders display value |
 
@@ -77,6 +95,7 @@ Interaction controls: `disable-add`, `disable-edit`, `disable-delete`, `disable-
 - `IFileObjectStorage` — `EnsureBucket`, `Upload`, `OpenRead`, `Delete`.
 - `S3FileObjectStorage` — AWS SDK S3 implementation (compatible with MinIO).
 - `FileStorageOptions` — `Provider`, `Endpoint`, `BucketName`, `AccessKey`, `SecretKey`, `UseSsl`.
+- `FileObject` record wraps `(ContentItem, ContentFile)` pair.
 - Auto-bucket creation: `EnsureBucketAsync()` checks existence via `DoesS3BucketExistV2Async`, creates via `PutBucketRequest` if missing. Called on every file upload.
 
 ### Web App (Demo)
@@ -97,14 +116,14 @@ Interaction controls: `disable-add`, `disable-edit`, `disable-delete`, `disable-
 
 ### Tests
 
-25+ NUnit tests across 10 files:
+46 NUnit tests across 10 files:
 
 | Test File | Tests |
 |-----------|-------|
-| `FeedComponentServiceTests` | 11 — auto-provisioning, content items, production mode, missing ID, trimming, post creation, invalid input, label normalization |
+| `FeedComponentServiceTests` | 11 — auto-provisioning, content items, production mode, missing ID, trimming, post creation, invalid input, label normalization, discriminator inference |
 | `FileComponentServiceTests` | 4 — auto-provisioning, upload with labels, per-container filtering, stream readback |
 | `EntityComponentServiceTests` | 4 — auto-provisioning, metadata+labels, per-list filtering, relationships |
-| `ContentServiceTests` | 3 — create with trimming, parent-based filtering, missing content |
+| `ContentServiceTests` | 4 — create with trimming, parent-based filtering, missing content |
 | `MetricServiceTests` | 4 — content count with window, metadata sum + display unit, series across containers, unknown metric |
 | `FeedTagHelperTests` | 5 — rendering, empty state, XSS, content items, system-managed, disable attrs |
 | `ForumTagHelperTests` | 3 — rendering, empty, XSS |
@@ -117,6 +136,16 @@ Test doubles (`InMemoryWorkplaceIqStore`, `InMemoryFileObjectStorage`, recording
 ---
 
 ## Coming Up
+
+### ADR-03: Dual UI Layer — Tag Helpers & Dedicated Controllers (Next)
+
+Refactor the web layer: dedicated controllers per container type (Feed, Forum, File, Entity), cleaner action routing, and a coherent controller pattern that replaces the current monolithic `ContentController`. See [ADR-03](docs/adr/03-ADR-UI-DualLayer.md).
+
+### ADR-04: OpenTelemetry-Driven Metrics Platform (Future)
+
+Implement a dual-category metrics system: **computed** metrics (on-demand from `IMetricProvider`) and **stored** metrics (persisted in DB from external pushes). Dual exposure via OTel standard `/metrics` endpoint and CMS well-known metric URLs. See [ADR-04](docs/adr/04-Metrics-Platform.md).
+
+---
 
 ### AI & Intelligence
 

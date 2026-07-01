@@ -6,7 +6,7 @@
 
 WorkplaceIQ's existing metrics infrastructure spans multiple layers:
 
-- **ADR 02** established Metrics as cross-cutting infrastructure with `ContentMetrics` and `ContentItemMetrics` link tables for storing metric data alongside entities.
+- **ADR 02** defined the core content model (Containers, ContentItems, Labels). This ADR extends it with `ContentMetrics` and `ContentItemMetrics` link tables for persisting metric data alongside entities.
 - **ADR 03** defined the `<iq-metric>` tag helper and well-known URL conventions.
 - **Code** has `IMetricProvider` / `IMetricService` / `MetricService` with `System.Diagnostics.Metrics` instrumentation (`Meter("WorkplaceIQ")`), `ContentCountMetricProvider`, `MetadataAggregationMetricProvider` (sum/avg/min/max), and `MetricTagHelper`.
 - **OpenTelemetry** is already wired in `ServiceDefaults` (AspNetCore/HttpClient/Runtime instrumentation) and `Program.cs` (`AddMeter("WorkplaceIQ")`).
@@ -49,7 +49,7 @@ CreateFeedItem(
     ...)
 ```
 
-Metrics are stored as rows in `ContentMetrics` / `ContentItemMetrics` (as designed in ADR 02), linked to the parent Content or ContentItem. A `MetricDefinition` record in the DB defines the interpretation (name, unit, display unit, description, aggregation hint). If no definition exists for a submitted metric name, the platform creates one on the fly with defaults.
+Metrics are stored as rows in `ContentMetrics` / `ContentItemMetrics` (as designed in this ADR), linked to the parent Content or ContentItem. A `MetricDefinition` record in the DB defines the interpretation (name, unit, display unit, description, aggregation hint). If no definition exists for a submitted metric name, the platform creates one on the fly with defaults.
 
 In the future a dedicated `/api/metrics` endpoint may be added for batch/decoupled submission, but inline is the primary pattern.
 
@@ -142,7 +142,7 @@ External metrics submitted alongside content creation are naturally scoped to th
 
 ### 4. DB-first store-and-forward
 
-Storing metrics in `ContentMetrics` tables (from ADR 02) means they survive process restarts, can be queried historically, and share the CMS permission model. The OTel scrape callback simply reads from the same tables — no dual-write or sync problem.
+Storing metrics in `ContentMetrics` tables means they survive process restarts, can be queried historically, and share the CMS permission model defined in ADR 02's Container scope. The OTel scrape callback simply reads from the same tables — no dual-write or sync problem.
 
 ### 5. `IMeterFactory` enables testability
 
@@ -190,7 +190,7 @@ ASP.NET Core recommends `IMeterFactory` over `new Meter()` because it isolates i
 
 ## Related
 
-- [ADR Domain-Content-Modeling-02](02-Domain-Content-Modeling.md) — Polymorphic content model with `ContentMetrics` / `ContentItemMetrics` tables that store externally-pushed metrics
+- [ADR Domain-Content-Modeling-02](02-Domain-Content-Modeling.md) — Polymorphic content model; this ADR extends it with stored-metrics link tables
 - [ADR UI-DualLayer-03](03-ADR-UI-DualLayer.md) — Tag helpers and well-known URL conventions that the Path B metric endpoints follow
 - [REQUIREMENTS.md §6](../REQUIREMENTS.md) — Generic metrics and business interpretation requirements
 - [REQUIREMENTS.md §10.4](../REQUIREMENTS.md) — Metrics API operations (get, history, compare, group)
