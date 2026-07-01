@@ -39,13 +39,7 @@ dotnet run --project src\WorkplaceIQ.Web\WorkplaceIQ.Web.csproj
 
 ## Build And Test
 
-```powershell
-dotnet restore
-dotnet build --configuration Release
-dotnet test --configuration Release
-```
-
-The repo may use the latest installed .NET SDK, including preview SDKs, while projects still target `net10.0`.
+Commands in [README.md](README.md#build--test). The repo may use the latest installed .NET SDK, including preview SDKs, while projects still target `net10.0`.
 
 ## Shell Tools
 
@@ -71,12 +65,7 @@ ADRs should describe **what** the system does at an architectural level and **wh
 
 ### Existing ADRs
 
-| ADR | Topic | Status |
-|-----|-------|--------|
-| [01-Library-Storage-PgVector-Connector](docs/adr/01-Library-Storage-PgVector-Connector.md) | SK PgVector connector & Npgsql version compatibility | Landed |
-| [02-Domain-Content-Modeling](docs/adr/02-Domain-Content-Modeling.md) | Unified polymorphic content model (TPT containers, standalone ContentItem) | Landed |
-| [03-ADR-UI-DualLayer](docs/adr/03-ADR-UI-DualLayer.md) | Dual UI Layer — Tag Helpers & Dedicated Controllers | Next |
-| [04-Metrics-Platform](docs/adr/04-Metrics-Platform.md) | OpenTelemetry-driven metrics platform | Future |
+See [ADR status in ARCHITECTURE.md](ARCHITECTURE.md#adr-status).
 
 ## DI Conventions
 
@@ -88,13 +77,7 @@ ADRs should describe **what** the system does at an architectural level and **wh
 
 ## Storage Providers
 
-Provider selection via `Storage:Provider` in `appsettings.json`:
-- `sqlite` (default dev) — `UseSqlite` + `SqliteVectorStore`
-- `pgvector` — `UseNpgsql` + `PostgresVectorStore`
-- `sqlserver` — `UseSqlServer` + `SqlServerVectorStore`
-- `inmemory` — `UseInMemoryDatabase` + `InMemoryVectorStore`
-
-See [ADR-01 Library-Storage-PgVector-Connector](docs/adr/01-Library-Storage-PgVector-Connector.md) for known compatibility notes on the PgVector/SK connector.
+Provider selection via `Storage:Provider` in `appsettings.json`. See the [table in ARCHITECTURE.md](ARCHITECTURE.md#storage-providers) for supported providers, EF Core mappings, and vector stores.
 
 ## Code Style
 
@@ -126,6 +109,6 @@ src/
 ## Testing
 
 - **Framework:** NUnit 4.x
-- **Test doubles:** `InMemoryWorkplaceIqStore` (list-based), `InMemoryFileObjectStorage`
+- **Test doubles:** `InMemoryWorkplaceIqStore` (list-based), `InMemoryFileObjectStorage` — full list in [ARCHITECTURE.md](ARCHITECTURE.md#tests)
 - **Naming:** `Method_Scenario_ExpectedBehavior`
 - **Pattern:** Arrange-Act-Assert (no comments needed)
