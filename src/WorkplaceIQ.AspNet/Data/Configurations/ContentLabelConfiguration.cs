@@ -13,11 +13,13 @@ public sealed class ContentLabelConfiguration : IEntityTypeConfiguration<Content
         entity
             .HasOne(cl => cl.Content)
             .WithMany(c => c.ContentLabels)
-            .HasForeignKey(cl => cl.ContentId);
+            .HasForeignKey(cl => cl.ContentId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         entity
             .HasOne(cl => cl.Label)
-            .WithMany()
-            .HasForeignKey(cl => cl.LabelId);
+            .WithMany(l => l.ContentLabels)
+            .HasForeignKey(cl => cl.LabelId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

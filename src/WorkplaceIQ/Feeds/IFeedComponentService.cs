@@ -1,4 +1,4 @@
-using WorkplaceIQ.Posts;
+using WorkplaceIQ.Content;
 
 namespace WorkplaceIQ.Feeds;
 
@@ -8,7 +8,7 @@ public interface IFeedComponentService
         FeedComponentRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<Post> CreatePostAsync(
+    Task<ContentItem> CreatePostAsync(
         string feedId,
         string title,
         string body,

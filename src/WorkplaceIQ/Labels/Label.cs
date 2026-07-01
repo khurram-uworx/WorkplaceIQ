@@ -27,5 +27,6 @@ public sealed class Label
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    public ICollection<PostLabel> PostLabels { get; set; } = [];
+    public ICollection<ContentLabel> ContentLabels { get; set; } = [];
+    public ICollection<ContentItemLabel> ContentItemLabels { get; set; } = [];
 }

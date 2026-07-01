@@ -22,7 +22,7 @@ public class EntityComponentServiceTests
         Assert.That(result.Created, Is.True);
         Assert.That(result.DisplayTitle, Is.EqualTo("Machines"));
         Assert.That(result.EntityType, Is.EqualTo("Machine"));
-        Assert.That(store.Contents.Single().ContentType, Is.EqualTo(ContentTypes.EntityContainer));
+        Assert.That(store.GroupContents.Single().Title, Is.EqualTo("Machines"));
     }
 
     [Test]
@@ -30,10 +30,9 @@ public class EntityComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateService(store);
-        await store.CreateContentAsync(new Content.Content
+        await store.CreateContainerAsync(new GroupContent
         {
             Name = "Machines",
-            ContentType = ContentTypes.EntityContainer,
             Title = "Machines"
         });
 
@@ -46,10 +45,10 @@ public class EntityComponentServiceTests
             MetadataJson: """{"floor":"A"}""",
             Labels: "Production, Critical"));
 
-        Assert.That(entity.ContentType, Is.EqualTo("Machine"));
+        Assert.That(entity.Discriminator, Is.EqualTo("member"));
         Assert.That(entity.Name, Is.EqualTo("press-12"));
-        Assert.That(entity.MetadataJson, Is.EqualTo("""{"floor":"A"}"""));
-        Assert.That(entity.ContentLabels.Select(label => label.Label!.Slug), Is.EquivalentTo(new[] { "production", "critical" }));
+        Assert.That(entity.ContentData, Is.EqualTo("""{"floor":"A"}"""));
+        Assert.That(entity.Labels.Select(label => label.Label!.Slug), Is.EquivalentTo(new[] { "production", "critical" }));
         Assert.That(store.Labels, Has.Count.EqualTo(2));
     }
 
@@ -58,29 +57,27 @@ public class EntityComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateService(store);
-        var machines = await store.CreateContentAsync(new Content.Content
+        var machines = await store.CreateContainerAsync(new GroupContent
         {
             Name = "Machines",
-            ContentType = ContentTypes.EntityContainer,
             Title = "Machines"
         });
-        var customers = await store.CreateContentAsync(new Content.Content
+        var customers = await store.CreateContainerAsync(new GroupContent
         {
             Name = "Customers",
-            ContentType = ContentTypes.EntityContainer,
             Title = "Customers"
         });
-        await store.CreateContentAsync(new Content.Content
+        await store.CreateItemAsync(new ContentItem
         {
-            ParentId = machines.Id,
-            ContentType = "Machine",
+            ContainerId = machines.Id,
+            Discriminator = "member",
             Name = "press-12",
             Title = "Press 12"
         });
-        await store.CreateContentAsync(new Content.Content
+        await store.CreateItemAsync(new ContentItem
         {
-            ParentId = customers.Id,
-            ContentType = "Customer",
+            ContainerId = customers.Id,
+            Discriminator = "member",
             Name = "acme",
             Title = "Acme"
         });
@@ -99,31 +96,30 @@ public class EntityComponentServiceTests
     {
         var store = new InMemoryWorkplaceIqStore();
         var service = CreateService(store);
-        var container = await store.CreateContentAsync(new Content.Content
+        var container = await store.CreateContainerAsync(new GroupContent
         {
             Name = "Machines",
-            ContentType = ContentTypes.EntityContainer,
             Title = "Machines"
         });
-        var source = await store.CreateContentAsync(new Content.Content
+        var source = await store.CreateItemAsync(new ContentItem
         {
-            ParentId = container.Id,
-            ContentType = "Machine",
+            ContainerId = container.Id,
+            Discriminator = "member",
             Name = "line-1",
             Title = "Line 1"
         });
-        var target = await store.CreateContentAsync(new Content.Content
+        var target = await store.CreateItemAsync(new ContentItem
         {
-            ParentId = container.Id,
-            ContentType = "Machine",
+            ContainerId = container.Id,
+            Discriminator = "member",
             Name = "press-12",
             Title = "Press 12"
         });
 
         var relationship = await service.CreateRelationshipAsync(source.Id, target.Id, "contains", """{"slot":1}""");
 
-        Assert.That(relationship.SourceContentId, Is.EqualTo(source.Id));
-        Assert.That(relationship.TargetContentId, Is.EqualTo(target.Id));
+        Assert.That(relationship.SourceContentId, Is.EqualTo(source.ContainerId));
+        Assert.That(relationship.TargetContentId, Is.EqualTo(target.ContainerId));
         Assert.That(relationship.RelationshipType, Is.EqualTo("contains"));
         Assert.That(relationship.MetadataJson, Is.EqualTo("""{"slot":1}"""));
         Assert.That(store.ContentRelationships, Has.Count.EqualTo(1));

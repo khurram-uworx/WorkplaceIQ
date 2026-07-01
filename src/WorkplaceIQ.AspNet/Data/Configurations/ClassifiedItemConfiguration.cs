@@ -9,7 +9,7 @@ public sealed class ClassifiedItemConfiguration : IEntityTypeConfiguration<Class
     public void Configure(EntityTypeBuilder<ClassifiedItem> entity)
     {
         entity.HasIndex(item => item.LabelId);
-        entity.HasIndex(item => item.ContentId);
+        entity.HasIndex(item => item.ContentId).IsUnique();
         entity.HasIndex(item => item.ClassificationSource);
         entity.HasIndex(item => item.ClassifiedAt);
 

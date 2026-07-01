@@ -13,10 +13,9 @@ public class MetricTagHelperTests
     public async Task ProcessAsync_BuildsMetricRequestFromAttributes()
     {
         var store = new InMemoryWorkplaceIqStore();
-        var container = await store.CreateContentAsync(new Content.Content
+        var container = await store.CreateContainerAsync(new FeedContent
         {
             Name = "PowerOutages",
-            ContentType = ContentTypes.FeedContainer,
             Title = "Power Outages"
         });
         var metricService = new RecordingMetricService(new MetricResult(

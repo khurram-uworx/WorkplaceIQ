@@ -47,7 +47,7 @@ public sealed class FilesController(IFileComponentService fileComponentService) 
         }
 
         var stream = await fileComponentService.OpenReadAsync(id);
-        return File(stream, file.FileRecord.ContentType, file.FileRecord.FileName);
+        return File(stream, file.ContentFile.ContentType, file.ContentFile.FileName);
     }
 
     private IActionResult RedirectToLocal(string? returnUrl)

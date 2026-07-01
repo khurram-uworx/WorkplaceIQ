@@ -1,7 +1,7 @@
 namespace WorkplaceIQ.Tests.TestDoubles;
 
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Forums;
-using WorkplaceIQ.Posts;
 
 internal sealed class RecordingForumComponentService(ForumComponentResult result) : IForumComponentService
 {
@@ -15,7 +15,7 @@ internal sealed class RecordingForumComponentService(ForumComponentResult result
         return Task.FromResult(result);
     }
 
-    public Task<Post> CreateThreadAsync(
+    public Task<ContentItem> CreateThreadAsync(
         string forumId,
         string title,
         string body,

@@ -1,7 +1,9 @@
+using WorkplaceIQ.Content;
+
 namespace WorkplaceIQ.Files;
 
 public sealed record FileComponentResult(
-    Content.Content? Container,
+    FolderContent? Container,
     IReadOnlyList<FileObject> Files,
     bool Created,
     bool Missing,

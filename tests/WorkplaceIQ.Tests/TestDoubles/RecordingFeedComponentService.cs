@@ -1,7 +1,7 @@
 namespace WorkplaceIQ.Tests.TestDoubles;
 
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Feeds;
-using WorkplaceIQ.Posts;
 
 internal sealed class RecordingFeedComponentService(FeedComponentResult result) : IFeedComponentService
 {
@@ -15,7 +15,7 @@ internal sealed class RecordingFeedComponentService(FeedComponentResult result) 
         return Task.FromResult(result);
     }
 
-    public Task<Post> CreatePostAsync(
+    public Task<ContentItem> CreatePostAsync(
         string feedId,
         string title,
         string body,

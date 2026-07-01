@@ -51,7 +51,7 @@ public sealed class ForumTagHelper(
             output.Attributes.SetAttribute("data-iq-missing", "true");
         }
 
-        output.Content.SetHtmlContent(renderer.RenderForum(result.DisplayTitle, result.Posts, interactions));
+        output.Content.SetHtmlContent(renderer.RenderForum(result.DisplayTitle, result.Items, interactions));
     }
 
     private ComponentInteractionOptions GetInteractionOptions()

@@ -1,4 +1,4 @@
-using WorkplaceIQ.Posts;
+using WorkplaceIQ.Content;
 
 namespace WorkplaceIQ.Forums;
 
@@ -8,7 +8,7 @@ public interface IForumComponentService
         ForumComponentRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<Post> CreateThreadAsync(
+    Task<ContentItem> CreateThreadAsync(
         string forumId,
         string title,
         string body,

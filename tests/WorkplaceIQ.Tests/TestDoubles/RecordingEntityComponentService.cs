@@ -15,14 +15,14 @@ internal sealed class RecordingEntityComponentService(EntityComponentResult resu
         return Task.FromResult(result);
     }
 
-    public Task<Content.Content?> ResolveDetailAsync(
+    public Task<ContentItem?> ResolveDetailAsync(
         string name,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<Content.Content?>(null);
+        return Task.FromResult<ContentItem?>(null);
     }
 
-    public Task<Content.Content> CreateEntityAsync(
+    public Task<ContentItem> CreateEntityAsync(
         EntityCreateRequest request,
         CancellationToken cancellationToken = default)
     {

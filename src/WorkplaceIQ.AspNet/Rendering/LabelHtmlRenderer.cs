@@ -6,10 +6,10 @@ namespace WorkplaceIQ.AspNet.Rendering;
 
 public sealed class LabelHtmlRenderer(HtmlEncoder htmlEncoder)
 {
-    public string Render(IEnumerable<PostLabel> postLabels)
+    public string RenderItemLabels(IEnumerable<ContentItemLabel> itemLabels)
     {
-        return RenderLabels(postLabels
-            .Select(postLabel => postLabel.Label)
+        return RenderLabels(itemLabels
+            .Select(itemLabel => itemLabel.Label)
             .Where(label => label is not null)!);
     }
 

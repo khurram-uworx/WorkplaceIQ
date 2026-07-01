@@ -19,7 +19,7 @@ public class PipelineOrchestrator(
 {
 
     sealed record EmbeddedWork(
-        Content.Content Content,
+        ContentItem Item,
         RssItem RssItem,
         ReadOnlyMemory<float> Embedding,
         bool EmbeddingSucceeded);
@@ -79,18 +79,18 @@ public class PipelineOrchestrator(
                 {
                     using var opScope = scopeFactory.CreateScope();
                     var opStore = opScope.ServiceProvider.GetRequiredService<IWorkplaceIqStore>();
-                    var existing = await opStore.GetContentByNameAsync(item.ContentHash, innerCt);
+                    var existing = await opStore.GetItemByNameAsync(item.ContentHash, innerCt);
                     if (existing is not null) return false;
 
-                    var content = new Content.Content
+                    var contentItem = new ContentItem
                     {
                         Name = item.ContentHash,
                         Title = item.Title,
                         Body = item.Summary,
-                        ContentType = "RssItem",
+                        Discriminator = "RssItem",
                         Status = "active"
                     };
-                    await opStore.CreateContentAsync(content, innerCt);
+                    await opStore.CreateItemAsync(contentItem, innerCt);
                     Interlocked.Increment(ref savedCount);
                     return true;
                 }, maxConcurrency: config.MaxConcurrency)
@@ -100,10 +100,10 @@ public class PipelineOrchestrator(
                 $"Fetched {savedCount} new items"));
 
             // Stage 3: Collect unprocessed items
-            var unprocessed = new List<Content.Content>();
-            await foreach (var c in store.GetUnclassifiedContentsAsync(int.MaxValue, innerCt))
+            var unprocessed = new List<ContentItem>();
+            await foreach (var c in store.GetUnclassifiedItemsAsync(int.MaxValue, innerCt))
             {
-                if (c.ContentType == "RssItem")
+                if (c.Discriminator == "RssItem")
                     unprocessed.Add(c);
             }
 
@@ -120,30 +120,30 @@ public class PipelineOrchestrator(
             var signalCounts = await store.GetSignalCountsAsync(innerCt);
             var currentClassified = signalCounts.Sum(kvp => kvp.Value);
 
-            await Flux.From<Content.Content>(unprocessed)
+            await Flux.From<ContentItem>(unprocessed)
                 .Checkpoint("Embed")
-                .FlatMap(async content =>
+                .FlatMap(async item =>
                 {
                     var rssItem = new RssItem
                     {
-                        Title = content.Title,
-                        Summary = content.Body ?? string.Empty,
+                        Title = item.Title,
+                        Summary = item.Body ?? string.Empty,
                         Link = string.Empty,
                         FeedUrl = string.Empty,
                         FeedName = string.Empty,
-                        Published = content.CreatedAt,
-                        ContentHash = content.Name
+                        Published = new DateTimeOffset(item.CreatedAt, TimeSpan.Zero),
+                        ContentHash = item.Name
                     };
 
                     try
                     {
                         var embedding = await embeddingService.GenerateAsync(rssItem, innerCt);
-                        return new EmbeddedWork(content, rssItem, embedding, true);
+                        return new EmbeddedWork(item, rssItem, embedding, true);
                     }
                     catch (Exception ex)
                     {
-                        progress.Report(new PipelineFailed("Embed", ex.Message, content.Id));
-                        return new EmbeddedWork(content, rssItem, ReadOnlyMemory<float>.Empty, false);
+                        progress.Report(new PipelineFailed("Embed", ex.Message, item.Id));
+                        return new EmbeddedWork(item, rssItem, ReadOnlyMemory<float>.Empty, false);
                     }
                 }, maxConcurrency: config.MaxConcurrency)
                 .Checkpoint("Classify")
@@ -210,11 +210,11 @@ public class PipelineOrchestrator(
                         Interlocked.Increment(ref failedCount);
                     }
 
-                    await PersistResultAsync(work.Content, work.Embedding, decision, attemptCount, innerCt);
+                    await PersistResultAsync(work.Item, work.Embedding, decision, attemptCount, innerCt);
                     Interlocked.Increment(ref processed);
 
                     progress.Report(new PipelineItemProcessed(
-                        work.Content.Id, work.RssItem.Title, decision.Result.Signal,
+                        work.Item.Id, work.RssItem.Title, decision.Result.Signal,
                         decision.Result.IsNoise, decision.Result.Reasoning,
                         decision.Result.HallucinatedSignal));
 
@@ -285,7 +285,7 @@ public class PipelineOrchestrator(
     }
 
     async Task PersistResultAsync(
-        Content.Content content,
+        ContentItem item,
         ReadOnlyMemory<float> embedding,
         ClassificationDecision decision,
         int attemptCount,
@@ -295,7 +295,7 @@ public class PipelineOrchestrator(
 
         var classifiedItem = new ClassifiedItem
         {
-            ContentId = content.Id,
+            ContentId = item.Id,
             LabelId = label.Id,
             Reasoning = decision.Result.Reasoning,
             IsNoise = decision.Result.IsNoise,
@@ -311,10 +311,10 @@ public class PipelineOrchestrator(
         {
             await collection.UpsertAsync(new SignalFlowVectorEntry
             {
-                Id = content.Id.ToString(),
+                Id = item.Id.ToString(),
                 Signal = decision.Result.Signal,
-                Title = content.Title,
-                Summary = content.Body ?? string.Empty,
+                Title = item.Title,
+                Summary = item.Body ?? string.Empty,
                 IsNoise = decision.Result.IsNoise,
                 ClassifiedAt = DateTime.UtcNow,
                 Embedding = embedding

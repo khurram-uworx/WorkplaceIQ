@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using System.Text;
 using System.Text.Encodings.Web;
+using WorkplaceIQ.Content;
 using WorkplaceIQ.Metrics;
 
 namespace WorkplaceIQ.AspNet.TagHelpers;
@@ -57,7 +58,7 @@ public sealed class MetricTagHelper(
             var containerId = ContainerId;
             if (containerId is null && !string.IsNullOrWhiteSpace(Source))
             {
-                var container = await store.GetContentByNameAsync(Source.Trim());
+                var container = await store.GetContainerByNameAsync<Container>(Source.Trim());
                 containerId = container?.Id;
             }
 

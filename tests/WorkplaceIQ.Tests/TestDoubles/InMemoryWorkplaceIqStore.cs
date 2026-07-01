@@ -1,392 +1,148 @@
 using System.Runtime.CompilerServices;
 using WorkplaceIQ.Content;
-using WorkplaceIQ.Files;
 using WorkplaceIQ.Labels;
 using WorkplaceIQ.Metrics;
-using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Tests.TestDoubles;
 
 internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
 {
-    public List<Content.Content> Contents { get; } = [];
-
-    public List<Post> Posts { get; } = [];
-
+    public List<DiscussionContent> DiscussionContents { get; } = [];
+    public List<FolderContent> FolderContents { get; } = [];
+    public List<FeedContent> FeedContents { get; } = [];
+    public List<GroupContent> GroupContents { get; } = [];
+    public List<ContentItem> Items { get; } = [];
+    public List<ContentFile> ContentFiles { get; } = [];
     public List<Label> Labels { get; } = [];
-
-    public List<FileRecord> FileRecords { get; } = [];
-
     public List<ContentRelationship> ContentRelationships { get; } = [];
-
     public List<MetricDefinition> MetricDefinitions { get; } = [];
-
     public List<ClassifiedItem> ClassifiedItems { get; } = [];
+    public List<ContentLabel> ContentLabels { get; } = [];
+    public List<ContentItemLabel> ContentItemLabels { get; } = [];
 
-    public Task<Content.Content?> GetContentByNameAsync(
-        string name,
-        CancellationToken cancellationToken = default)
+    private List<T> GetContainerList<T>() where T : Container
     {
-        return Task.FromResult(Contents.FirstOrDefault(c => c.Name == name));
+        if (typeof(T) == typeof(DiscussionContent)) return DiscussionContents as List<T> ?? [];
+        if (typeof(T) == typeof(FolderContent)) return FolderContents as List<T> ?? [];
+        if (typeof(T) == typeof(FeedContent)) return FeedContents as List<T> ?? [];
+        if (typeof(T) == typeof(GroupContent)) return GroupContents as List<T> ?? [];
+        if (typeof(T) == typeof(Container)) return GetAllContainers().Cast<T>().ToList();
+        return [];
     }
 
-    public Task<Content.Content?> GetContentByIdAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(Contents.FirstOrDefault(c => c.Id == contentId));
-    }
+    // ── Container CRUD ──────────────────────────────────────────────
 
-    public Task<IReadOnlyList<Content.Content>> GetChildrenAsync(
-        Guid parentId,
-        string? contentType = null,
-        CancellationToken cancellationToken = default)
-    {
-        var query = Contents
-            .Where(c => c.ParentId == parentId)
-            .Where(c => c.Status != "archived");
+    public Task<T?> GetContainerByIdAsync<T>(Guid id, CancellationToken ct = default) where T : Container
+        => Task.FromResult(GetContainerList<T>().FirstOrDefault(c => c.Id == id));
 
-        if (!string.IsNullOrWhiteSpace(contentType))
+    public Task<T?> GetContainerByNameAsync<T>(string name, CancellationToken ct = default) where T : Container
+        => Task.FromResult(GetContainerList<T>().FirstOrDefault(c => c.Name == name));
+
+    public Task<IReadOnlyList<T>> GetContainersByTypeAsync<T>(CancellationToken ct = default) where T : Container
+        => Task.FromResult<IReadOnlyList<T>>(
+            GetContainerList<T>().Where(c => c.Status != "archived").OrderBy(c => c.Title).ToList());
+
+    public Task<IReadOnlyList<Container>> GetAllContainersAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Container>>(GetAllContainers().Where(c => c.Status != "archived").OrderBy(c => c.Title).ToList());
+
+    public Task<T> CreateContainerAsync<T>(T container, CancellationToken ct = default) where T : Container
+    {
+        if (typeof(T) == typeof(Container))
         {
-            query = query.Where(c => c.ContentType == contentType);
+            AddContainerByRuntimeType(container);
+            return Task.FromResult(container);
         }
-
-        return Task.FromResult<IReadOnlyList<Content.Content>>(
-            query.OrderBy(c => c.Title).ToList());
+        GetContainerList<T>().Add(container);
+        return Task.FromResult(container);
     }
 
-    public Task<IReadOnlyList<Content.Content>> GetContentByTypeAsync(
-        string contentType,
-        CancellationToken cancellationToken = default)
+    private void AddContainerByRuntimeType(Container container)
     {
-        return Task.FromResult<IReadOnlyList<Content.Content>>(
-            Contents
-                .Where(c => c.ContentType == contentType)
-                .Where(c => c.Status != "archived")
-                .OrderBy(c => c.Title)
-                .ToList());
+        if (container is GroupContent gc) { GroupContents.Add(gc); return; }
+        if (container is FeedContent fc) { FeedContents.Add(fc); return; }
+        if (container is DiscussionContent dc) { DiscussionContents.Add(dc); return; }
+        if (container is FolderContent flc) { FolderContents.Add(flc); return; }
     }
 
-    public Task<Content.Content> CreateContentAsync(
-        Content.Content content,
-        CancellationToken cancellationToken = default)
+    public Task<T> UpdateContainerAsync<T>(T container, CancellationToken ct = default) where T : Container
     {
-        Contents.Add(content);
-        return Task.FromResult(content);
+        var list = GetContainerList<T>();
+        var index = list.FindIndex(c => c.Id == container.Id);
+        if (index >= 0) list[index] = container;
+        return Task.FromResult(container);
     }
 
-    public Task<Content.Content> UpdateContentAsync(
-        Content.Content content,
-        CancellationToken cancellationToken = default)
+    public Task DeleteContainerAsync(Guid id, CancellationToken ct = default)
     {
-        var index = Contents.FindIndex(c => c.Id == content.Id);
-        if (index >= 0)
+        foreach (var container in GetAllContainers().Where(c => c.Id == id))
         {
-            Contents[index] = content;
-        }
-        return Task.FromResult(content);
-    }
-
-    public Task DeleteContentAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
-    {
-        var content = Contents.FirstOrDefault(c => c.Id == contentId);
-        if (content is not null)
-        {
-            content.Status = "archived";
+            container.Status = "archived";
         }
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<Post>> GetPostsAsync(
-        Guid containerId,
-        CancellationToken cancellationToken = default)
+    // ── ContentItem CRUD ────────────────────────────────────────────
+
+    public Task<ContentItem?> GetItemByNameAsync(string name, CancellationToken ct = default)
+        => Task.FromResult(Items.FirstOrDefault(i => i.Name == name));
+
+    public Task<ContentItem?> GetItemByIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
+
+    public Task<IReadOnlyList<ContentItem>> GetItemsByContainerAsync(
+        Guid containerId, string? discriminator = null, CancellationToken ct = default)
     {
-        return Task.FromResult<IReadOnlyList<Post>>(
-            Posts.Where(post => post.ContainerId == containerId).ToList());
+        var query = Items.Where(i => i.ContainerId == containerId).Where(i => i.Status != "archived");
+        if (!string.IsNullOrWhiteSpace(discriminator))
+            query = query.Where(i => i.Discriminator == discriminator);
+        return Task.FromResult<IReadOnlyList<ContentItem>>(query.OrderByDescending(i => i.CreatedAt).ToList());
     }
 
-    public Task<Post?> GetPostByIdAsync(
-        Guid postId,
-        CancellationToken cancellationToken = default)
+    public Task<ContentItem> CreateItemAsync(ContentItem item, CancellationToken ct = default)
+    { Items.Add(item); return Task.FromResult(item); }
+
+    public Task<ContentItem> UpdateItemAsync(ContentItem item, CancellationToken ct = default)
     {
-        return Task.FromResult(Posts.FirstOrDefault(post => post.Id == postId));
+        var index = Items.FindIndex(i => i.Id == item.Id);
+        if (index >= 0) Items[index] = item;
+        return Task.FromResult(item);
     }
 
-    public Task<Post> CreatePostAsync(
-        Guid containerId,
-        string title,
-        string body,
-        IReadOnlyList<LabelName> labels,
-        Guid? contentId = null,
-        string? postType = null,
-        string? authorUserId = null,
-        bool isSystemGenerated = false,
-        string? metadataJson = null,
-        CancellationToken cancellationToken = default)
+    public Task DeleteItemAsync(Guid id, CancellationToken ct = default)
     {
-        var containerType = Contents.FirstOrDefault(c => c.Id == containerId)?.ContentType;
-        var post = new Post
-        {
-            ContainerId = containerId,
-            Title = title,
-            Body = body,
-            ContentId = contentId,
-            PostType = postType ?? InferPostType(contentId, containerType),
-            AuthorUserId = authorUserId,
-            IsSystemGenerated = isSystemGenerated,
-            MetadataJson = metadataJson
-        };
-
-        foreach (var labelName in labels)
-        {
-            var label = Labels.FirstOrDefault(candidate =>
-                candidate.NormalizedName == labelName.NormalizedName);
-
-            if (label is null)
-            {
-                label = new Label
-                {
-                    Name = labelName.Name,
-                    NormalizedName = labelName.NormalizedName,
-                    Slug = labelName.Slug
-                };
-                Labels.Add(label);
-            }
-
-            post.PostLabels.Add(new PostLabel
-            {
-                Post = post,
-                PostId = post.Id,
-                Label = label,
-                LabelId = label.Id
-            });
-        }
-
-        Posts.Add(post);
-
-        return Task.FromResult(post);
-    }
-
-    public Task<Post> UpdatePostAsync(
-        Post post,
-        CancellationToken cancellationToken = default)
-    {
-        var index = Posts.FindIndex(candidate => candidate.Id == post.Id);
-        if (index >= 0)
-        {
-            Posts[index] = post;
-        }
-        return Task.FromResult(post);
-    }
-
-    public Task DeletePostAsync(
-        Guid postId,
-        CancellationToken cancellationToken = default)
-    {
-        Posts.RemoveAll(post => post.Id == postId);
+        var item = Items.FirstOrDefault(i => i.Id == id);
+        if (item is not null) item.Status = "archived";
         return Task.CompletedTask;
     }
 
-    private static string InferPostType(Guid? contentId, string? containerType)
-    {
-        if (contentId.HasValue)
-        {
-            return PostTypes.Comment;
-        }
+    // ── File CRUD ───────────────────────────────────────────────────
 
-        return containerType == ContentTypes.ForumContainer
-            ? PostTypes.Thread
-            : PostTypes.Post;
-    }
+    public Task<ContentFile?> GetContentFileByItemIdAsync(Guid itemId, CancellationToken ct = default)
+        => Task.FromResult(ContentFiles.FirstOrDefault(f => f.Id == itemId));
 
-    public Task<IReadOnlyList<FileObject>> GetFilesByContainerAsync(
-        Guid containerId,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult<IReadOnlyList<FileObject>>(
-            FileRecords
-                .Select(file => new
-                {
-                    FileRecord = file,
-                    Content = Contents.FirstOrDefault(content => content.Id == file.ContentId)
-                })
-                .Where(row => row.Content is not null)
-                .Where(row => row.Content!.ParentId == containerId)
-                .Where(row => row.Content!.ContentType == FileContentTypes.File)
-                .Where(row => row.Content!.Status != "archived")
-                .OrderByDescending(row => row.Content!.UpdatedAt)
-                .Select(row => new FileObject(row.Content!, row.FileRecord))
-                .ToList());
-    }
+    public Task<ContentFile> CreateContentFileAsync(ContentFile file, CancellationToken ct = default)
+    { ContentFiles.Add(file); return Task.FromResult(file); }
 
-    public Task<FileObject?> GetFileByContentIdAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
-    {
-        var file = FileRecords.FirstOrDefault(candidate => candidate.ContentId == contentId);
-        var content = Contents.FirstOrDefault(candidate => candidate.Id == contentId);
-        if (file is null || content is null || content.Status == "archived")
-        {
-            return Task.FromResult<FileObject?>(null);
-        }
+    // ── Classification ──────────────────────────────────────────────
 
-        return Task.FromResult<FileObject?>(new FileObject(content, file));
-    }
+    public Task<ClassifiedItem?> GetClassifiedItemByIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(ClassifiedItems.FirstOrDefault(item => item.Id == id));
 
-    public Task<FileObject> CreateFileRecordAsync(
-        FileRecord fileRecord,
-        CancellationToken cancellationToken = default)
-    {
-        FileRecords.Add(fileRecord);
-        var content = Contents.First(c => c.Id == fileRecord.ContentId);
-        return Task.FromResult(new FileObject(content, fileRecord));
-    }
-
-    public Task<ContentRelationship> CreateContentRelationshipAsync(
-        ContentRelationship relationship,
-        CancellationToken cancellationToken = default)
-    {
-        relationship.SourceContent = Contents.FirstOrDefault(c => c.Id == relationship.SourceContentId);
-        relationship.TargetContent = Contents.FirstOrDefault(c => c.Id == relationship.TargetContentId);
-        ContentRelationships.Add(relationship);
-        relationship.SourceContent?.SourceRelationships.Add(relationship);
-        relationship.TargetContent?.TargetRelationships.Add(relationship);
-        return Task.FromResult(relationship);
-    }
-
-    public Task AddLabelToContentAsync(
-        Guid contentId,
-        LabelName label,
-        CancellationToken cancellationToken = default)
-    {
-        var content = Contents.FirstOrDefault(item => item.Id == contentId);
-        if (content is null)
-        {
-            return Task.CompletedTask;
-        }
-
-        var labelEntity = GetOrCreateLabel(label);
-        content.ContentLabels.Add(new ContentLabel
-        {
-            Content = content,
-            ContentId = content.Id,
-            Label = labelEntity,
-            LabelId = labelEntity.Id
-        });
-        return Task.CompletedTask;
-    }
-
-    public Task AddLabelToPostAsync(
-        Guid postId,
-        LabelName label,
-        CancellationToken cancellationToken = default)
-    {
-        var post = Posts.FirstOrDefault(item => item.Id == postId);
-        if (post is null)
-        {
-            return Task.CompletedTask;
-        }
-
-        var labelEntity = GetOrCreateLabel(label);
-        post.PostLabels.Add(new PostLabel
-        {
-            Post = post,
-            PostId = post.Id,
-            Label = labelEntity,
-            LabelId = labelEntity.Id
-        });
-        return Task.CompletedTask;
-    }
-
-    private Label GetOrCreateLabel(LabelName labelName)
-    {
-        var label = Labels.FirstOrDefault(candidate => candidate.NormalizedName == labelName.NormalizedName);
-        if (label is not null)
-        {
-            return label;
-        }
-
-        label = new Label
-        {
-            Name = labelName.Name,
-            NormalizedName = labelName.NormalizedName,
-            Slug = labelName.Slug
-        };
-        Labels.Add(label);
-        return label;
-    }
-
-    // ----- Label queries -----
-
-    public Task<Label?> GetLabelByNameAsync(
-        string name,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(Labels.FirstOrDefault(l =>
-            string.Equals(l.NormalizedName, name, StringComparison.OrdinalIgnoreCase)));
-    }
-
-    public Task<Label> CreateLabelAsync(
-        Label label,
-        CancellationToken cancellationToken = default)
-    {
-        Labels.Add(label);
-        return Task.FromResult(label);
-    }
-
-    // ----- Classification queries -----
-
-    public Task<ClassifiedItem?> GetClassifiedItemByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(ClassifiedItems.FirstOrDefault(item => item.Id == id));
-    }
-
-    public Task<ClassifiedItem?> GetClassifiedByContentIdAsync(
-        Guid contentId,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(ClassifiedItems.FirstOrDefault(item => item.ContentId == contentId));
-    }
+    public Task<ClassifiedItem?> GetClassifiedByContentIdAsync(Guid contentId, CancellationToken ct = default)
+        => Task.FromResult(ClassifiedItems.FirstOrDefault(item => item.ContentId == contentId));
 
     public Task<IReadOnlyList<ClassifiedItem>> GetClassifiedItemsByLabelAsync(
-        Guid labelId,
-        int offset = 0,
-        int limit = 50,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult<IReadOnlyList<ClassifiedItem>>(
-            ClassifiedItems
-                .Where(item => item.LabelId == labelId)
-                .OrderByDescending(item => item.ClassifiedAt)
-                .Skip(offset)
-                .Take(limit)
-                .ToList());
-    }
+        Guid labelId, int offset = 0, int limit = 50, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ClassifiedItem>>(
+            ClassifiedItems.Where(item => item.LabelId == labelId)
+                .OrderByDescending(item => item.ClassifiedAt).Skip(offset).Take(limit).ToList());
 
-    public Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(
-        int limit = 20,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult<IReadOnlyList<ClassifiedItem>>(
-            ClassifiedItems
-                .Where(item => !item.IsNoise)
-                .OrderByDescending(item => item.ClassifiedAt)
-                .Take(limit)
-                .ToList());
-    }
+    public Task<IReadOnlyList<ClassifiedItem>> GetRecentClassifiedItemsAsync(int limit = 20, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ClassifiedItem>>(
+            ClassifiedItems.Where(item => !item.IsNoise)
+                .OrderByDescending(item => item.ClassifiedAt).Take(limit).ToList());
 
-    /// <summary>
-    /// In-memory upsert matching EfWorkplaceIqStore behavior.
-    /// Preserves original Id when updating an existing classification.
-    /// This double must stay in sync with the EF implementation for ADR 02 refactoring safety.
-    /// </summary>
-    public Task<ClassifiedItem> UpsertClassifiedItemAsync(
-        ClassifiedItem item,
-        CancellationToken cancellationToken = default)
+    public Task<ClassifiedItem> UpsertClassifiedItemAsync(ClassifiedItem item, CancellationToken ct = default)
     {
         var existing = ClassifiedItems.FirstOrDefault(ci => ci.ContentId == item.ContentId);
         if (existing is not null)
@@ -401,63 +157,92 @@ internal sealed class InMemoryWorkplaceIqStore : IWorkplaceIqStore
             existing.ClassifiedAt = item.ClassifiedAt;
             return Task.FromResult(existing);
         }
-
         ClassifiedItems.Add(item);
         return Task.FromResult(item);
     }
 
-    public Task<ClassifiedItem> UpdateClassifiedItemAsync(
-        ClassifiedItem item,
-        CancellationToken cancellationToken = default)
+    public Task<ClassifiedItem> UpdateClassifiedItemAsync(ClassifiedItem item, CancellationToken ct = default)
     {
         var index = ClassifiedItems.FindIndex(c => c.Id == item.Id);
-        if (index >= 0)
-        {
-            ClassifiedItems[index] = item;
-        }
+        if (index >= 0) ClassifiedItems[index] = item;
         return Task.FromResult(item);
     }
 
-    public Task<Dictionary<Guid, int>> GetSignalCountsAsync(
-        CancellationToken cancellationToken = default)
+    public Task<Dictionary<Guid, int>> GetSignalCountsAsync(CancellationToken ct = default)
+        => Task.FromResult(ClassifiedItems.GroupBy(item => item.LabelId).ToDictionary(g => g.Key, g => g.Count()));
+
+    public Task DeleteClassifiedItemAsync(Guid id, CancellationToken ct = default)
+    { ClassifiedItems.RemoveAll(c => c.Id == id); return Task.CompletedTask; }
+
+    public async IAsyncEnumerable<ContentItem> GetUnclassifiedItemsAsync(int limit, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        return Task.FromResult(
-            ClassifiedItems
-                .GroupBy(item => item.LabelId)
-                .ToDictionary(g => g.Key, g => g.Count()));
+        var classifiedIds = new HashSet<Guid>(ClassifiedItems.Select(item => item.ContentId));
+        var unclassified = Items.Where(i => i.Status != "archived")
+            .Where(i => !classifiedIds.Contains(i.Id))
+            .OrderByDescending(i => i.CreatedAt).Take(limit).ToList();
+        foreach (var item in unclassified) yield return item;
     }
 
-    public Task DeleteClassifiedItemAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
+    // ── Labels ──────────────────────────────────────────────────────
+
+    public Task<Label?> GetLabelByNameAsync(string name, CancellationToken ct = default)
+        => Task.FromResult(Labels.FirstOrDefault(l =>
+            string.Equals(l.NormalizedName, name, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<Label> CreateLabelAsync(Label label, CancellationToken ct = default)
+    { Labels.Add(label); return Task.FromResult(label); }
+
+    public Task AddLabelToContentAsync(Guid contentId, LabelName label, CancellationToken ct = default)
     {
-        ClassifiedItems.RemoveAll(c => c.Id == id);
+        var content = GetAllContainers().FirstOrDefault(c => c.Id == contentId);
+        if (content is null) return Task.CompletedTask;
+        var labelEntity = GetOrCreateLabel(label);
+        ContentLabels.Add(new ContentLabel { ContentId = content.Id, Content = content, LabelId = labelEntity.Id, Label = labelEntity });
         return Task.CompletedTask;
     }
 
-    public async IAsyncEnumerable<Content.Content> GetUnclassifiedContentsAsync(
-        int limit,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public Task AddLabelToItemAsync(Guid itemId, LabelName label, CancellationToken ct = default)
     {
-        var classifiedIds = new HashSet<Guid>(ClassifiedItems.Select(item => item.ContentId));
-        var unclassified = Contents
-            .Where(c => c.Status != "archived")
-            .Where(c => c.RetryCount < 5)
-            .Where(c => !classifiedIds.Contains(c.Id))
-            .OrderByDescending(c => c.CreatedAt)
-            .Take(limit)
-            .ToList();
-
-        foreach (var item in unclassified)
-        {
-            yield return item;
-        }
+        var item = Items.FirstOrDefault(i => i.Id == itemId);
+        if (item is null) return Task.CompletedTask;
+        var labelEntity = GetOrCreateLabel(label);
+        var itemLabel = new ContentItemLabel { ContentItemId = item.Id, ContentItem = item, LabelId = labelEntity.Id, Label = labelEntity };
+        ContentItemLabels.Add(itemLabel);
+        item.Labels.Add(itemLabel);
+        return Task.CompletedTask;
     }
 
-    public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(
-        string name,
-        CancellationToken cancellationToken = default)
+    private Label GetOrCreateLabel(LabelName labelName)
     {
-        return Task.FromResult(MetricDefinitions.FirstOrDefault(m => m.Name == name));
+        var label = Labels.FirstOrDefault(candidate => candidate.NormalizedName == labelName.NormalizedName);
+        if (label is not null) return label;
+        label = new Label { Name = labelName.Name, NormalizedName = labelName.NormalizedName, Slug = labelName.Slug };
+        Labels.Add(label);
+        return label;
     }
+
+    private IEnumerable<Container> GetAllContainers()
+    {
+        foreach (var c in DiscussionContents) yield return c;
+        foreach (var c in FolderContents) yield return c;
+        foreach (var c in FeedContents) yield return c;
+        foreach (var c in GroupContents) yield return c;
+    }
+
+    // ── Relationships ───────────────────────────────────────────────
+
+    public Task<ContentRelationship> CreateContentRelationshipAsync(ContentRelationship relationship, CancellationToken ct = default)
+    {
+        relationship.SourceContent = GetAllContainers().FirstOrDefault(c => c.Id == relationship.SourceContentId);
+        relationship.TargetContent = GetAllContainers().FirstOrDefault(c => c.Id == relationship.TargetContentId);
+        ContentRelationships.Add(relationship);
+        relationship.SourceContent?.SourceRelationships.Add(relationship);
+        relationship.TargetContent?.TargetRelationships.Add(relationship);
+        return Task.FromResult(relationship);
+    }
+
+    // ── Metrics ─────────────────────────────────────────────────────
+
+    public Task<MetricDefinition?> GetMetricDefinitionByNameAsync(string name, CancellationToken ct = default)
+        => Task.FromResult(MetricDefinitions.FirstOrDefault(m => m.Name == name));
 }

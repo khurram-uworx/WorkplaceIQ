@@ -1,6 +1,5 @@
 using WorkplaceIQ.Components;
 using WorkplaceIQ.Content;
-using WorkplaceIQ.Posts;
 
 namespace WorkplaceIQ.Forums;
 
@@ -14,20 +13,20 @@ public sealed class ForumComponentService(IComponentService componentService) : 
             new ComponentRequest(
                 request.Id,
                 request.Title,
-                ContentTypes.ForumContainer,
+                "ForumContainer",
                 request.AutoProvision,
                 "forum"),
             cancellationToken);
 
         return new ForumComponentResult(
-            result.Container,
-            result.Posts,
+            result.Container as DiscussionContent,
+            result.Items,
             result.Created,
             result.Missing,
             result.DisplayTitle);
     }
 
-    public Task<Post> CreateThreadAsync(
+    public Task<ContentItem> CreateThreadAsync(
         string forumId,
         string title,
         string body,
@@ -36,12 +35,12 @@ public sealed class ForumComponentService(IComponentService componentService) : 
     {
         return componentService.CreatePostAsync(
             forumId,
-            ContentTypes.ForumContainer,
+            "ForumContainer",
             "forum",
             title,
             body,
             labels,
-            postType: PostTypes.Thread,
+            discriminator: "topic",
             cancellationToken: cancellationToken);
     }
 }
